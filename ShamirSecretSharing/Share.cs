@@ -4,12 +4,48 @@ using System.Globalization;
 namespace ShamirSecretSharing;
 
 /// <summary>
-/// Represents a single share.
-/// X is the x-coordinate (must be unique and non-zero for each share).
-/// YValues is an array of y-coordinates, one for each int of the secret.
+/// Represents a single share in Shamir's Secret Sharing scheme.
 /// </summary>
-public record Share(int X, int[] YValues)
+/// <remarks>
+/// Each share consists of a unique, non-zero x-coordinate and an array of y-coordinates
+/// corresponding to the secret's bytes or integer values.
+/// </remarks>
+public record Share
 {
+    /// <summary>
+    /// Gets the x-coordinate of the share.
+    /// Must be unique and non-zero for each share.
+    /// </summary>
+    public int X { get; }
+
+    /// <summary>
+    /// Gets the array of y-coordinates for the share.
+    /// Each element corresponds to a byte or integer of the secret.
+    /// </summary>
+    public int[] YValues { get; }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="Share"/> record.
+    /// </summary>
+    /// <param name="X">The unique, non-zero x-coordinate of the share.</param>
+    /// <param name="YValues">The array of y-coordinates for the share.</param>
+    public Share(int X, int[] YValues)
+    {
+        this.X = X;
+        this.YValues = YValues;
+    }
+
+    /// <summary>
+    /// Deconstructs the share into its components.
+    /// </summary>
+    /// <param name="x">The x-coordinate of the share.</param>
+    /// <param name="yValues">The array of y-coordinates for the share.</param>
+    public void Deconstruct(out int x, out int[] yValues)
+    {
+        x = X;
+        yValues = YValues;
+    }
+
     /// <summary>
     /// Serializes the share to a compact string representation.
     /// Format: X:Y0Y1Y2... (each Y as 2 hex digits, unless 3+ hex digits, then wrap with commas)
@@ -45,10 +81,10 @@ public record Share(int X, int[] YValues)
     /// Deserializes a share from its string representation.
     /// </summary>
     /// <param name="shareString">The string representation of the share.</param>
-    /// <returns>A Share object.</returns>
-    /// <exception cref="ArgumentNullException">If shareString is null or empty.</exception>
-    /// <exception cref="ArgumentException">If the shareString is not in the expected format.</exception>
-    /// <exception cref="FormatException">If the shareString is not in the expected format.</exception>
+    /// <returns>A <see cref="Share"/> object.</returns>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="shareString"/> is null or empty.</exception>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="shareString"/> is not in the expected format.</exception>
+    /// <exception cref="FormatException">Thrown if <paramref name="shareString"/> is not in the expected format.</exception>
     public static Share Parse(string shareString)
     {
         if (string.IsNullOrEmpty(shareString))

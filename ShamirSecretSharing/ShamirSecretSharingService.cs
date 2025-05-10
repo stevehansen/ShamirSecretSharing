@@ -3,11 +3,30 @@ using System.Text;
 
 namespace ShamirSecretSharing;
 
+/// <summary>
+/// Provides functionality for Shamir's Secret Sharing scheme, allowing splitting
+/// and reconstructing secrets using threshold cryptography.
+/// </summary>
+/// <remarks>
+/// Shamir's Secret Sharing is a cryptographic algorithm that splits a secret into
+/// multiple shares, requiring a threshold number of shares to reconstruct the original
+/// secret. This implementation uses a finite field GF(p) for calculations, where p
+/// is a prime number (default 257, suitable for byte values 0-255).
+/// </remarks>
 public class ShamirSecretSharingService
 {
     private readonly FiniteField _field;
     private const int DefaultPrime = 257; // Smallest prime > 255
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ShamirSecretSharingService"/> class.
+    /// </summary>
+    /// <param name="prime">The prime modulus to use for the finite field. Defaults to 257.</param>
+    /// <remarks>
+    /// The prime value must be greater than any value in your secret data and greater than
+    /// the total number of shares you want to create. For byte array secrets, the default
+    /// value of 257 is suitable as it's the smallest prime greater than 255.
+    /// </remarks>
     public ShamirSecretSharingService(int prime = DefaultPrime)
     {
         _field = new(prime);
@@ -19,7 +38,13 @@ public class ShamirSecretSharingService
     /// <param name="secret">The secret data to split.</param>
     /// <param name="n">The total number of shares to create.</param>
     /// <param name="t">The threshold of shares required to reconstruct the secret.</param>
-    /// <returns>A list of n shares.</returns>
+    /// <returns>An array of n shares.</returns>
+    /// <exception cref="ArgumentException">
+    /// Thrown when secret is null or empty, or when a secret byte value is too large for the chosen prime.
+    /// </exception>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// Thrown when t is less than or equal to 1, n is less than t, or n is greater than or equal to the prime modulus.
+    /// </exception>
     public Share[] SplitSecret(byte[] secret, int n, int t)
     {
         if (secret == null || secret.Length == 0)
@@ -80,6 +105,10 @@ public class ShamirSecretSharingService
     /// <param name="shares">A list of at least t shares.</param>
     /// <param name="t">The original threshold used when splitting.</param>
     /// <returns>The reconstructed secret byte array.</returns>
+    /// <exception cref="ArgumentException">
+    /// Thrown when the shares list is null or empty, contains fewer than t shares,
+    /// contains shares with YValues of different lengths, or does not contain enough distinct shares.
+    /// </exception>
     public byte[] ReconstructSecret(IReadOnlyList<Share> shares, int t)
     {
         if (shares == null || shares.Count == 0)
@@ -138,7 +167,12 @@ public class ShamirSecretSharingService
         return reconstructedSecret;
     }
 
-    // Helper to evaluate polynomial P(x) = c0 + c1*x + c2*x^2 + ...
+    /// <summary>
+    /// Evaluates a polynomial at a specified x-coordinate.
+    /// </summary>
+    /// <param name="coefficients">The coefficients of the polynomial, where coefficients[i] is the coefficient of x^i.</param>
+    /// <param name="x">The x-coordinate at which to evaluate the polynomial.</param>
+    /// <returns>The value of the polynomial at x.</returns>
     private int EvaluatePolynomial(int[] coefficients, int x)
     {
         var result = 0;
@@ -152,13 +186,30 @@ public class ShamirSecretSharingService
         return result;
     }
 
-    // Convenience methods for strings
+    /// <summary>
+    /// Splits a secret string into n shares, with t shares required for reconstruction.
+    /// </summary>
+    /// <param name="secret">The secret string to split.</param>
+    /// <param name="n">The total number of shares to create.</param>
+    /// <param name="t">The threshold of shares required to reconstruct the secret.</param>
+    /// <param name="encoding">The encoding to use for converting the string to bytes. Defaults to UTF-8.</param>
+    /// <returns>An array of n shares.</returns>
+    /// <exception cref="ArgumentException">Thrown if the secret is null or empty.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown if t or n are invalid.</exception>
     public Share[] SplitSecret(string secret, int n, int t, Encoding? encoding = null)
     {
         encoding ??= Encoding.UTF8;
         return SplitSecret(encoding.GetBytes(secret), n, t);
     }
 
+    /// <summary>
+    /// Reconstructs a secret string from a list of shares.
+    /// </summary>
+    /// <param name="shares">A list of at least t shares.</param>
+    /// <param name="t">The original threshold used when splitting.</param>
+    /// <param name="encoding">The encoding to use for converting bytes back to a string. Defaults to UTF-8.</param>
+    /// <returns>The reconstructed secret string.</returns>
+    /// <exception cref="ArgumentException">Thrown if the shares list is invalid.</exception>
     public string ReconstructSecretString(IReadOnlyList<Share> shares, int t, Encoding? encoding = null)
     {
         encoding ??= Encoding.UTF8;
