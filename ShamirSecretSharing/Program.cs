@@ -18,17 +18,26 @@ public class Program
         foreach (var share in shares)
         {
             // In a real application, you'd store/transmit these securely.
-            Console.WriteLine($"Share {share.X} (Serialized): {share.SerializeToString()}");
+            Console.WriteLine($"Share {share.X} (Serialized): {share}");
+        }
+        Console.WriteLine();
+
+        // Demo split again to show that we get different shares each time
+
+        Console.WriteLine($"Splitting the same secret again into {n} shares, requiring {t} to reconstruct...\n");
+        var newShares = sss.SplitSecret(originalSecret, n, t);
+        foreach (var share in newShares)
+        {
+            Console.WriteLine($"New Share {share.X} (Serialized): {share}");
         }
         Console.WriteLine();
 
         // --- Reconstruction ---
         // Simulate having only a subset of shares
-        var random = new Random();
 
         for (var i = 0; i < 10; i++)
         {
-            var availableShares = shares.OrderBy(x => random.Next()).Take(t).ToList();
+            var availableShares = shares.OrderBy(x => Random.Shared.Next()).Take(t).ToList();
             // Make sure to take at least t shares, e.g. Take(random.Next(t, n + 1))
 
             Console.WriteLine($"Attempting reconstruction with {availableShares.Count} shares (IDs: {string.Join(", ", availableShares.Select(s => s.X))}):");

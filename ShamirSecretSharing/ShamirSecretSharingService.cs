@@ -35,11 +35,10 @@ public class ShamirSecretSharingService
         var shares = new Share[n];
         var yValuesPerShare = new int[n][];
         for (var i = 0; i < n; i++)
-        {
             yValuesPerShare[i] = new int[secret.Length];
-        }
 
         // For each byte of the secret
+        var randomBytes = new byte[t - 1];
         for (var byteIndex = 0; byteIndex < secret.Length; byteIndex++)
         {
             var secretByte = secret[byteIndex];
@@ -52,7 +51,6 @@ public class ShamirSecretSharingService
             var coefficients = new int[t];
             coefficients[0] = secretByte; // a0
 
-            var randomBytes = new byte[t - 1];
             RandomNumberGenerator.Fill(randomBytes); // Cryptographically secure random numbers
 
             for (var i = 1; i < t; i++)
@@ -71,9 +69,7 @@ public class ShamirSecretSharingService
         }
 
         for (var i = 0; i < n; i++)
-        {
             shares[i] = new(i + 1, yValuesPerShare[i]);
-        }
 
         return shares;
     }

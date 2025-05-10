@@ -1,39 +1,41 @@
 ﻿using System.Text;
+using System.Globalization;
 
 namespace ShamirSecretSharing;
 
 /// <summary>
 /// Represents a single share.
 /// X is the x-coordinate (must be unique and non-zero for each share).
-/// YValues is an array of y-coordinates, one for each byte of the secret.
+/// YValues is an array of y-coordinates, one for each int of the secret.
 /// </summary>
 public record Share(int X, int[] YValues)
 {
-    public override string ToString()
-    {
-        // Provides a human-readable string, good for debugging.
-        // For actual storage/transport, SerializeToString is likely better.
-        return $"Share(X={X}, YValues=[{string.Join(",", YValues)}])";
-    }
-
     /// <summary>
     /// Serializes the share to a compact string representation.
-    /// Format: X:Y0,Y1,Y2,...
+    /// Format: X:Y0Y1Y2... (each Y as 2 hex digits, unless 3+ hex digits, then wrap with commas)
     /// </summary>
     /// <returns>A string representation of the share.</returns>
-    public string SerializeToString()
+    public override string ToString()
     {
-        // Using simple decimal representation for X and Y values.
-        // Base64 encoding of a binary format would be more compact for large Y values or many Y values.
         var sb = new StringBuilder();
-        sb.Append(X);
+        sb.Append(X.ToString("X"));
         sb.Append(':');
-        for (var i = 0; i < YValues.Length; i++)
+        foreach (var y in YValues)
         {
-            sb.Append(YValues[i]);
-            if (i < YValues.Length - 1)
+            var hex = y.ToString("X");
+            switch (hex.Length)
             {
-                sb.Append(',');
+                case 1:
+                    sb.Append('0').Append(hex); // pad single digit
+                    break;
+
+                case 2:
+                    sb.Append(hex);
+                    break;
+
+                default:
+                    sb.Append(',').Append(hex).Append(',');
+                    break;
             }
         }
         return sb.ToString();
@@ -45,31 +47,53 @@ public record Share(int X, int[] YValues)
     /// <param name="shareString">The string representation of the share.</param>
     /// <returns>A Share object.</returns>
     /// <exception cref="ArgumentNullException">If shareString is null or empty.</exception>
+    /// <exception cref="ArgumentException">If the shareString is not in the expected format.</exception>
     /// <exception cref="FormatException">If the shareString is not in the expected format.</exception>
-    public static Share DeserializeFromString(string shareString)
+    public static Share Parse(string shareString)
     {
         if (string.IsNullOrEmpty(shareString))
             throw new ArgumentNullException(nameof(shareString));
 
-        var parts = shareString.Split(':');
+        var parts = shareString.Split(':', 2);
         if (parts.Length != 2)
-            throw new FormatException("Share string must contain one ':' separator for X and YValues.");
+            throw new ArgumentException($"Share string must contain one ':' separator for X and YValues.\nshareString = {shareString}", nameof(shareString));
 
-        if (!int.TryParse(parts[0], out var x))
-            throw new FormatException("Invalid X value in share string.");
+        // Parse X as hexadecimal
+        if (!int.TryParse(parts[0], NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var x))
+            throw new ArgumentException($"Invalid X value in share string.\nX = {parts[0]}", nameof(shareString));
 
-        if (string.IsNullOrEmpty(parts[1])) // Handle case of empty secret (YValues is empty array)
+        if (string.IsNullOrEmpty(parts[1]))
+            throw new ArgumentException("YValues cannot be empty.", nameof(shareString));
+
+        var yList = new List<int>();
+        var s = parts[1];
+        var pos = 0;
+        while (pos < s.Length)
         {
-            return new(x, []);
+            if (s[pos] == ',')
+            {
+                // 3+ hex digits, wrapped in commas
+                var nextComma = s.IndexOf(',', pos + 1);
+                if (nextComma == -1)
+                    throw new FormatException("Unmatched comma in YValues section.");
+                var hex = s.Substring(pos + 1, nextComma - pos - 1);
+                if (!int.TryParse(hex, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var y))
+                    throw new FormatException($"Invalid Y value '{hex}' in share string.");
+                yList.Add(y);
+                pos = nextComma + 1;
+            }
+            else
+            {
+                // Always 2 hex digits
+                if (pos + 2 > s.Length)
+                    throw new FormatException("Unexpected end of YValues section.");
+                var hex = s.Substring(pos, 2);
+                if (!int.TryParse(hex, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var y))
+                    throw new FormatException($"Invalid Y value '{hex}' in share string.");
+                yList.Add(y);
+                pos += 2;
+            }
         }
-
-        var yValueStrings = parts[1].Split(',');
-        var yValues = new int[yValueStrings.Length];
-        for (var i = 0; i < yValueStrings.Length; i++)
-        {
-            if (!int.TryParse(yValueStrings[i], out yValues[i]))
-                throw new FormatException($"Invalid Y value '{yValueStrings[i]}' at index {i} in share string.");
-        }
-        return new(x, yValues);
+        return new(x, yList.ToArray());
     }
 }
