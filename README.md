@@ -1,5 +1,11 @@
 # Shamir's Secret Sharing in C#
 
+![icon](icon.png)
+
+[![NuGet](https://img.shields.io/nuget/v/ShamirSecretSharing.svg)](https://www.nuget.org/packages/ShamirSecretSharing/)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE.txt)
+![Tests](https://img.shields.io/badge/tests-MSTest-orange)
+
 A pure C# implementation of Shamir's Secret Sharing (SSS) scheme, designed for .NET 8/9 without external library dependencies beyond the .NET Base Class Library.
 
 ## Overview
@@ -53,11 +59,11 @@ int n = 5; // Total shares
 int t = 3; // Threshold
 
 // Split a string (UTF-8 encoding by default)
-List<Share> shares = sss.SplitSecret(originalSecret, n, t);
+Share[] shares = sss.SplitSecret(originalSecret, n, t);
 
 // Or split a byte array
 // byte[] secretBytes = Encoding.UTF8.GetBytes(originalSecret);
-// List<Share> shares = sss.SplitSecret(secretBytes, n, t);
+// Share[] shares = sss.SplitSecret(secretBytes, n, t);
 
 foreach (var share in shares)
 {
@@ -112,8 +118,8 @@ else
 ### Share Serialization
 
 The `Share` record provides methods for serialization:
--   `share.SerializeToString()`: Converts a `Share` object to a string like `"X:Y0,Y1,Y2,..."`.
--   `Share.DeserializeFromString(string s)`: Converts a serialized string back into a `Share` object.
+-   `share.ToString()`: Converts a `Share` object to a string like `"X:Y0,Y1,Y2,..."`.
+-   `Share.Parse(string s)`: Converts a serialized string back into a `Share` object.
 
 ### Prime Number (`_field.Prime`)
 
@@ -139,6 +145,7 @@ The `Share` record provides methods for serialization:
 -   `Share.cs`: Defines the `Share` record and its serialization/deserialization logic.
 -   `ShamirSecretSharingService.cs`: Contains the core logic for splitting and reconstructing secrets.
 -   `ShamirSecretSharingTests/` (Separate Project): Contains MSTest unit tests.
+-   `ShamirSecretSharing.Console/` (Separate Project): Contains a console application for testing the library interactively.
 
 ## Building and Testing
 
