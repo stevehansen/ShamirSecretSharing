@@ -244,10 +244,10 @@ public class ShamirTests
         var secret = new byte[50]; // A longer secret increases chances
         new Random().NextBytes(secret); // Random secret bytes
 
-        for (var i = 0; i < secret.Length; i++)
-        { // Ensure no secret byte is >= prime (not an issue for byte into GF(257))
-            if (secret[i] >= 257) secret[i] = (byte)(secret[i] % 257);
-        }
+        //for (var i = 0; i < secret.Length; i++)
+        //{ // Ensure no secret byte is >= prime (not an issue for byte into GF(257))
+        //    if (secret[i] >= 257) secret[i] = (byte)(secret[i] % 257);
+        //}
 
 
         var n = 5;
