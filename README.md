@@ -22,7 +22,7 @@ This is a `(t, n)` threshold scheme:
 -   **No External Dependencies:** Relies only on standard .NET libraries (e.g., `System.Security.Cryptography` for random number generation).
 -   **Byte-Oriented:** Primarily designed to split `byte[]` secrets. Convenience methods for `string` secrets (using UTF-8 encoding by default) are also provided.
 -   **Finite Field Arithmetic:** Performs calculations in GF(257) by default, suitable for byte-wise secret sharing (each byte 0-255 becomes a field element). The prime can be configured.
--   **Share Serialization:** Includes methods to serialize shares to and from strings for easier storage or transmission.
+-   **Share Serialization:** Includes methods to serialize shares to and from strings using a colon-delimited hexadecimal format (e.g., `X_hex:Y0_hex:Y1_hex:...`).
 -   **Unit Tested:** Comes with a set of MSTest unit tests to verify correctness.
 
 ## How to Use
@@ -54,7 +54,7 @@ using System.Text;
 using System.Collections.Generic;
 
 var sss = new ShamirSecretSharingService();
-string originalSecret = "My Top Secret Data!";
+string originalSecret = "My Top Secret Data!"; // Example secret
 int n = 5; // Total shares
 int t = 3; // Threshold
 
@@ -67,8 +67,10 @@ Share[] shares = sss.SplitSecret(originalSecret, n, t);
 
 foreach (var share in shares)
 {
-    Console.WriteLine($"Share {share.X} (raw): {share.ToString()}");
-    Console.WriteLine($"Share {share.X} (serialized): {share.SerializeToString()}");
+    string serializedShare = share.ToString();
+    Console.WriteLine($"Share {share.X} (serialized): {serializedShare}");
+    // Example output for a share like (X=1, YValues=[100, 200]): Share 1 (serialized): 1:64:C8
+    // (Actual Y values depend on the secret and random polynomial)
     // Store/distribute these serializedShare strings securely.
 }
 ```
@@ -81,16 +83,32 @@ To reconstruct the secret using a sufficient number of (serialized) shares:
 // Assume you have collected at least 't' serialized shares
 List<string> collectedSerializedShares = new List<string>
 {
-    // Example: shares[0].SerializeToString(), shares[2].SerializeToString(), shares[4].SerializeToString()
-    "1:167,129,32,84,111,114,32,83,101,99,114,101,116,32,68,97,116,97,33", // Placeholder
-    "3:187,157,188,112,111,114,32,83,101,99,114,101,116,32,68,97,116,97,33", // Placeholder
-    "5:207,185,20,140,111,114,32,83,101,99,114,101,116,32,68,97,116,97,33"  // Placeholder
+    // Example for a secret like "Hi" (bytes [72, 105]) split with t=2:
+    "1:C4:A1", // Example for a share (X=1, YValues might be [196, 161] in hex)
+    "2:B8:D3", // Example for another share (X=2, YValues might be [184, 211] in hex)
+    // "3:AD:05"  // And another, if you collected more than t.
+    // Note: These are illustrative. Actual values depend on the secret and the random polynomial generated.
+    // For the "My Top Secret Data!" example, shares would be longer, e.g., "1:CD:D4:A8:C8:92:8E:A8:B7:9A:A6:8E:A1:9A:A8:B1:A3:A6:8C"
 };
 
 List<Share> sharesForReconstruction = new List<Share>();
-foreach (string sShareStr in collectedSerializedShares)
+foreach (string serializedShare in collectedSerializedShares)
 {
-    sharesForReconstruction.Add(Share.DeserializeFromString(sShareStr));
+    try
+    {
+        sharesForReconstruction.Add(Share.Parse(serializedShare));
+    }
+    catch (FormatException ex)
+    {
+        Console.WriteLine($"Error parsing share string \"{serializedShare}\": {ex.Message}");
+        // Handle error: skip share, log, or terminate
+        continue;
+    }
+    catch (ArgumentNullException ex)
+    {
+        Console.WriteLine($"Error parsing share string: {ex.Message}"); // For null/empty string
+        continue;
+    }
 }
 
 if (sharesForReconstruction.Count >= t)
@@ -106,20 +124,20 @@ if (sharesForReconstruction.Count >= t)
     }
     catch (ArgumentException ex)
     {
-        Console.WriteLine($"Reconstruction failed: {ex.Message}"); // e.g., not enough distinct shares
+        Console.WriteLine($"Reconstruction failed: {ex.Message}"); // e.g., not enough distinct shares, or inconsistent YValue lengths
     }
 }
 else
 {
-    Console.WriteLine("Not enough shares to reconstruct the secret.");
+    Console.WriteLine("Not enough successfully parsed shares to reconstruct the secret.");
 }
 ```
 
 ### Share Serialization
 
 The `Share` record provides methods for serialization:
--   `share.ToString()`: Converts a `Share` object to a string like `"X:Y0,Y1,Y2,..."`.
--   `Share.Parse(string s)`: Converts a serialized string back into a `Share` object.
+-   `share.ToString()`: Converts a `Share` object to a string where the X-coordinate and all Y-values are represented in hexadecimal format, delimited by colons (e.g., `X_hex:Y0_hex:Y1_hex:...`). For instance, a share with `X=10` and `YValues=[255, 1, 16]` would be serialized as `"A:FF:1:10"`.
+-   `Share.Parse(string s)`: Converts a serialized string (in the format produced by `ToString()`) back into a `Share` object. It throws `ArgumentNullException` if the string is null/empty or `FormatException` if the string is malformed or contains invalid hexadecimal values.
 
 ### Prime Number (`_field.Prime`)
 
@@ -129,7 +147,7 @@ The `Share` record provides methods for serialization:
 
 ## Security Considerations
 
--   **Randomness:** The security of SSS relies on the cryptographic randomness of the coefficients chosen for the polynomial. This implementation uses `System.Security.Cryptography.RandomNumberGenerator` for this purpose.
+-   **Randomness:** The security of SSS relies on the cryptographic randomness of the coefficients chosen for the polynomial. This implementation uses `System.Security.Cryptography.RandomNumberGenerator` for this purpose, with improved unbiased generation for coefficients.
 -   **Share Security:** Each individual share must be kept secret. If an attacker obtains `t` or more shares, they can reconstruct the secret. SSS protects against the loss/compromise of *up to* `t-1` shares.
 -   **Integrity/Authenticity:** This basic SSS implementation does not inherently protect against malicious shares (a participant providing a fake or altered share during reconstruction). For such scenarios, Verifiable Secret Sharing (VSS) schemes are needed.
 -   **Side Channels:** As with any cryptographic implementation, consider potential side-channel attacks depending on the environment where share generation or reconstruction occurs.
@@ -141,9 +159,9 @@ The `Share` record provides methods for serialization:
 
 ## Project Structure
 
--   `FiniteField.cs`: Implements arithmetic operations in a Galois Field GF(p).
--   `Share.cs`: Defines the `Share` record and its serialization/deserialization logic.
--   `ShamirSecretSharingService.cs`: Contains the core logic for splitting and reconstructing secrets.
+-   `ShamirSecretSharing/FiniteField.cs`: Implements arithmetic operations in a Galois Field GF(p).
+-   `ShamirSecretSharing/Share.cs`: Defines the `Share` record and its serialization/deserialization logic.
+-   `ShamirSecretSharing/ShamirSecretSharingService.cs`: Contains the core logic for splitting and reconstructing secrets.
 -   `ShamirSecretSharingTests/` (Separate Project): Contains MSTest unit tests.
 -   `ShamirSecretSharing.Console/` (Separate Project): Contains a console application for testing the library interactively.
 

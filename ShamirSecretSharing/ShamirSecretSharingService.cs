@@ -63,7 +63,6 @@ public class ShamirSecretSharingService
             yValuesPerShare[i] = new int[secret.Length];
 
         // For each byte of the secret
-        var randomBytes = new byte[t - 1];
         for (var byteIndex = 0; byteIndex < secret.Length; byteIndex++)
         {
             var secretByte = secret[byteIndex];
@@ -76,12 +75,10 @@ public class ShamirSecretSharingService
             var coefficients = new int[t];
             coefficients[0] = secretByte; // a0
 
-            RandomNumberGenerator.Fill(randomBytes); // Cryptographically secure random numbers
-
             for (var i = 1; i < t; i++)
             {
-                // Ensure coefficients are within the field
-                coefficients[i] = randomBytes[i - 1] % _field.Prime;
+                // Ensure coefficients are within the field using unbiased random number generation
+                coefficients[i] = GenerateRandomInRange(_field.Prime);
             }
 
             // Generate n points (shares) on this polynomial
@@ -184,6 +181,64 @@ public class ShamirSecretSharingService
             powerOfX = _field.Multiply(powerOfX, x);
         }
         return result;
+    }
+
+    private static int GenerateRandomInRange(int exclusiveUpperBound)
+    {
+        if (exclusiveUpperBound <= 0)
+            throw new ArgumentOutOfRangeException(nameof(exclusiveUpperBound), "Exclusive upper bound must be positive.");
+
+        int numBytes;
+        if (exclusiveUpperBound <= 256) // 2^8
+            numBytes = 1;
+        else if (exclusiveUpperBound <= 65536) // 2^16
+            numBytes = 2;
+        else if (exclusiveUpperBound <= 16777216) // 2^24
+            numBytes = 3;
+        else // Max int value is 2,147,483,647, which is less than 256^4
+            numBytes = 4;
+
+        // Calculate maxValidValueThreshold for rejection sampling to avoid modulo bias.
+        // This is the largest multiple of exclusiveUpperBound that is less than or equal to 256^numBytes.
+        long theoreticalMaxPossibleValue = 1;
+        // Calculate 256^numBytes. Using a loop to avoid potential precision issues with Math.Pow for large numBytes.
+        for(int i=0; i<numBytes; ++i) theoreticalMaxPossibleValue *= 256; 
+        
+        long maxValidValueThreshold = theoreticalMaxPossibleValue - (theoreticalMaxPossibleValue % exclusiveUpperBound);
+        // If exclusiveUpperBound is a power of 256 (or fits perfectly), the modulo would be 0.
+        // In this case, all values from 0 to theoreticalMaxPossibleValue-1 are valid if generatedValue < theoreticalMaxPossibleValue
+        // So, maxValidValueThreshold effectively becomes theoreticalMaxPossibleValue
+        if (maxValidValueThreshold == theoreticalMaxPossibleValue) {
+             // This handles cases where exclusiveUpperBound is a power of 256 (e.g. 256, 65536)
+             // or a divisor of theoreticalMaxPossibleValue.
+             // No rejection is needed if the generated value is within the range [0, theoreticalMaxPossibleValue-1]
+        }
+
+
+        var randomBytesBuffer = new byte[numBytes];
+        while (true)
+        {
+            RandomNumberGenerator.Fill(randomBytesBuffer);
+
+            long generatedValue = 0;
+            // Convert bytes to long, assuming LittleEndian.
+            // This is consistent with BitConverter.ToInt32/ToInt64 on Windows.
+            // For strict cross-platform determinism, one might check BitConverter.IsLittleEndian
+            // and reverse bytes if necessary, but for internal consistency of random generation, this is fine.
+            for (var i = 0; i < numBytes; i++)
+            {
+                generatedValue |= ((long)randomBytesBuffer[i] << (i * 8));
+            }
+            
+            // Apply rejection sampling: if the generated value is too high (i.e., in the biased range), try again.
+            // This ensures that the distribution of (generatedValue % exclusiveUpperBound) is uniform.
+            if (generatedValue < maxValidValueThreshold)
+            {
+                return (int)(generatedValue % exclusiveUpperBound);
+            }
+            // If generatedValue >= maxValidValueThreshold, it falls into the range where modulo would create bias,
+            // so we discard it and generate a new random number.
+        }
     }
 
     /// <summary>
