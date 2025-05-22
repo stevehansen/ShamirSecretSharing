@@ -286,4 +286,78 @@ public class ShamirTests
         Assert.AreEqual(0xAB, parsed2.X);
         CollectionAssert.AreEqual(new[] { 0x123, 0x4, 0x56 }, parsed2.YValues);
     }
+
+    [TestMethod]
+    [ExpectedException(typeof(ArgumentNullException))]
+    public void Share_Parse_ThrowsOnNull()
+    {
+        Share.Parse(null!);
+    }
+
+    [TestMethod]
+    [ExpectedException(typeof(ArgumentNullException))]
+    public void Share_Parse_ThrowsOnEmpty()
+    {
+        Share.Parse("");
+    }
+
+    [TestMethod]
+    [ExpectedException(typeof(ArgumentException))]
+    public void Share_Parse_ThrowsOnMissingColon()
+    {
+        Share.Parse("01AA");
+    }
+
+    [TestMethod]
+    [ExpectedException(typeof(ArgumentException))]
+    public void Share_Parse_ThrowsOnInvalidX()
+    {
+        Share.Parse("ZZ:00");
+    }
+
+    [TestMethod]
+    [ExpectedException(typeof(FormatException))]
+    public void Share_Parse_ThrowsOnInvalidY()
+    {
+        Share.Parse("01:GG");
+    }
+
+    [TestMethod]
+    [ExpectedException(typeof(FormatException))]
+    public void Share_Parse_ThrowsOnUnmatchedComma()
+    {
+        Share.Parse("01:,123");
+    }
+
+    [TestMethod]
+    [ExpectedException(typeof(ArgumentOutOfRangeException))]
+    public void SplitSecret_ThrowsWhenThresholdTooSmall()
+    {
+        byte[] secret = { 1, 2, 3 };
+        _sss.SplitSecret(secret, n: 3, t: 1);
+    }
+
+    [TestMethod]
+    [ExpectedException(typeof(ArgumentOutOfRangeException))]
+    public void SplitSecret_ThrowsWhenNLessThanT()
+    {
+        byte[] secret = { 1, 2, 3 };
+        _sss.SplitSecret(secret, n: 2, t: 3);
+    }
+
+    [TestMethod]
+    [ExpectedException(typeof(ArgumentException))]
+    public void SplitSecret_ThrowsWhenSecretEmpty()
+    {
+        _sss.SplitSecret(Array.Empty<byte>(), n: 2, t: 2);
+    }
+
+    [TestMethod]
+    [ExpectedException(typeof(ArgumentException))]
+    public void ReconstructSecret_ThrowsWhenShareLengthsDiffer()
+    {
+        var s1 = new Share(1, new[] { 1, 2 });
+        var s2 = new Share(2, new[] { 3 });
+        _sss.ReconstructSecret(new List<Share> { s1, s2 }, t: 2);
+    }
 }
