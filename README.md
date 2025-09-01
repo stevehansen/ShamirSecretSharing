@@ -23,6 +23,7 @@ This is a `(t, n)` threshold scheme:
 -   **Byte-Oriented:** Primarily designed to split `byte[]` secrets. Convenience methods for `string` secrets (using UTF-8 encoding by default) are also provided.
 -   **Finite Field Arithmetic:** Performs calculations in GF(257) by default, suitable for byte-wise secret sharing (each byte 0-255 becomes a field element). The prime can be configured.
 -   **Share Serialization:** Includes methods to serialize shares to and from strings for easier storage or transmission.
+-   **Authenticated Shares:** Support for cryptographically authenticated shares with HMAC-SHA256 signatures to detect tampering and temporal validity tracking.
 -   **Unit Tested:** Comes with a set of MSTest unit tests to verify correctness.
 
 ## How to Use
@@ -121,6 +122,55 @@ The `Share` record provides methods for serialization:
 -   `share.ToString()`: Converts a `Share` object to a string like `"X:Y0,Y1,Y2,..."`.
 -   `Share.Parse(string s)`: Converts a serialized string back into a `Share` object.
 
+### Authenticated Shares
+
+For enhanced security, the library provides authenticated shares that include cryptographic signatures to detect tampering:
+
+```csharp
+using ShamirSecretSharing;
+
+// Create an authenticator with a shared key
+var key = Encoding.UTF8.GetBytes("YourSecureKeyAtLeast16BytesLong!");
+var authenticator = new HmacShareAuthenticator(key);
+
+// Or create with a random key
+var (authenticator, generatedKey) = HmacShareAuthenticator.CreateWithRandomKey();
+
+// Create the authenticated service
+var authService = new AuthenticatedShamirService(authenticator);
+
+// Split a secret with authentication
+string secret = "Sensitive data requiring tamper protection";
+int n = 5; // Total shares
+int t = 3; // Threshold
+var expiresIn = TimeSpan.FromDays(7); // Optional expiration
+
+AuthenticatedShare[] authShares = authService.SplitAuthenticatedSecret(
+    secret, n, t, expiresIn);
+
+// Serialize authenticated shares for storage/transmission
+foreach (var authShare in authShares)
+{
+    string serialized = authShare.ToString();
+    Console.WriteLine($"Authenticated Share {authShare.Share.X}: {serialized}");
+}
+
+// Reconstruct from authenticated shares
+var collectedShares = authShares.Take(t).ToList(); // Use any t shares
+string reconstructed = authService.ReconstructAuthenticatedSecretString(
+    collectedShares, t);
+
+// The service automatically validates signatures and expiration
+// If any share is tampered with or expired, reconstruction will fail with an exception
+```
+
+#### Key Features of Authenticated Shares:
+
+-   **Tamper Detection:** Each share includes an HMAC-SHA256 signature that is verified during reconstruction
+-   **Temporal Validity:** Shares can have optional expiration times
+-   **Validation:** The `ValidateShares` method allows checking share integrity before reconstruction
+-   **Flexible Authentication:** The `IShareAuthenticator` interface allows custom authentication implementations
+
 ### Prime Number (`_field.Prime`)
 
 -   The default prime used is 257. This is suitable for splitting `byte[]` secrets, as each byte (0-255) can be a field element.
@@ -131,7 +181,8 @@ The `Share` record provides methods for serialization:
 
 -   **Randomness:** The security of SSS relies on the cryptographic randomness of the coefficients chosen for the polynomial. This implementation uses `System.Security.Cryptography.RandomNumberGenerator` for this purpose.
 -   **Share Security:** Each individual share must be kept secret. If an attacker obtains `t` or more shares, they can reconstruct the secret. SSS protects against the loss/compromise of *up to* `t-1` shares.
--   **Integrity/Authenticity:** This basic SSS implementation does not inherently protect against malicious shares (a participant providing a fake or altered share during reconstruction). For such scenarios, Verifiable Secret Sharing (VSS) schemes are needed.
+-   **Integrity/Authenticity:** The library now provides authenticated shares using HMAC-SHA256 signatures to protect against malicious or corrupted shares. The `AuthenticatedShamirService` automatically validates share integrity during reconstruction, rejecting tampered shares.
+-   **Key Management:** When using authenticated shares, the HMAC key must be securely shared among all authorized parties. Consider using asymmetric authentication (RSA/ECDSA) for scenarios where key distribution is challenging.
 -   **Side Channels:** As with any cryptographic implementation, consider potential side-channel attacks depending on the environment where share generation or reconstruction occurs.
 
 ## Limitations
@@ -144,6 +195,10 @@ The `Share` record provides methods for serialization:
 -   `FiniteField.cs`: Implements arithmetic operations in a Galois Field GF(p).
 -   `Share.cs`: Defines the `Share` record and its serialization/deserialization logic.
 -   `ShamirSecretSharingService.cs`: Contains the core logic for splitting and reconstructing secrets.
+-   `AuthenticatedShare.cs`: Extends shares with cryptographic signatures and timestamps.
+-   `IShareAuthenticator.cs`: Interface for implementing different authentication strategies.
+-   `HmacShareAuthenticator.cs`: HMAC-SHA256 based share authentication implementation.
+-   `AuthenticatedShamirService.cs`: Service for creating and verifying authenticated shares.
 -   `ShamirSecretSharingTests/` (Separate Project): Contains MSTest unit tests.
 -   `ShamirSecretSharing.Console/` (Separate Project): Contains a console application for testing the library interactively.
 

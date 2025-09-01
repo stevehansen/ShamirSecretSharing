@@ -54,7 +54,7 @@ public record Share
     public override string ToString()
     {
         var sb = new StringBuilder();
-        sb.Append(X.ToString("X"));
+        sb.Append(X.ToString("X2")); // Ensure X is at least 2 hex digits
         sb.Append(':');
         foreach (var y in YValues)
         {

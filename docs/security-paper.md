@@ -37,13 +37,17 @@ Provided that the required number of valid shares are available, reconstruction 
 
 ## Implementation Overview
 
-The project consists of three main components:
+The project consists of the following components:
 
 - **FiniteField.cs:** Implements arithmetic within GF(p), where `p` is a prime number. The default prime is 257, allowing direct splitting of byte values (0-255).
 - **Share.cs:** Represents an individual share, storing an X coordinate and corresponding Y values. It also includes serialization methods for easy storage and transmission.
 - **ShamirSecretSharingService.cs:** Provides methods to split and reconstruct secrets, using cryptographically secure random coefficients via `System.Security.Cryptography.RandomNumberGenerator`.
+- **AuthenticatedShare.cs:** Extends basic shares with cryptographic signatures and temporal validity metadata.
+- **IShareAuthenticator.cs:** Defines the interface for implementing different authentication strategies.
+- **HmacShareAuthenticator.cs:** Provides HMAC-SHA256 based authentication for detecting tampered shares.
+- **AuthenticatedShamirService.cs:** Orchestrates authenticated share creation and validation.
 
-Unit tests (`ShamirSecretSharingTests`) verify correctness of the splitting and reconstruction logic.
+Unit tests (`ShamirSecretSharingTests`) verify correctness of both basic and authenticated splitting/reconstruction logic.
 
 ## Potential Vulnerabilities
 
@@ -51,9 +55,15 @@ Unit tests (`ShamirSecretSharingTests`) verify correctness of the splitting and 
 
 If the random number generator is weak or predictable, an attacker may guess the coefficients of the secret polynomial and reconstruct the secret with fewer than `t` shares. This implementation relies on `RandomNumberGenerator`, which is suitable for cryptographic purposes. Substituting a non-cryptographic RNG would reduce security drastically.
 
-### Malicious Shares (Lack of Verifiability)
+### Malicious Shares and Authentication
 
-SSS alone does not provide a way to verify share authenticity. An adversary could supply fabricated shares during reconstruction, leading to failures or invalid secrets. Verifiable Secret Sharing (VSS) schemes extend SSS to mitigate this, typically using commitments or signatures. Consider integrating a VSS layer or additional checks if your use case is susceptible to malicious participants.
+Traditional SSS alone does not provide a way to verify share authenticity. An adversary could supply fabricated shares during reconstruction, leading to failures or invalid secrets. This implementation now includes authenticated shares to address this vulnerability:
+
+- **HMAC Authentication:** The `AuthenticatedShare` class wraps regular shares with HMAC-SHA256 signatures, enabling automatic detection of tampered or corrupted shares during reconstruction.
+- **Temporal Validity:** Shares can include expiration timestamps, preventing the use of old shares that may have been compromised.
+- **Automatic Validation:** The `AuthenticatedShamirService` validates all shares before reconstruction, rejecting any with invalid signatures or expired timestamps.
+
+While not a full Verifiable Secret Sharing (VSS) scheme, this authentication layer provides practical protection against most share tampering scenarios. For distributed environments where key distribution is challenging, consider implementing asymmetric authentication using the `IShareAuthenticator` interface.
 
 ### Share Leakage and Aggregation
 
@@ -68,13 +78,15 @@ Although the implementation is straightforward, side-channel leakage could occur
 1. **Use Strong Randomness:** Always rely on cryptographically secure randomness. The default RNG in this library is adequate; avoid custom or weaker RNGs.
 2. **Secure Each Share:** Treat each share like sensitive data. Store and transmit over secure channels (e.g., encrypted storage, TLS). Apply least privilege to limit who can access each share.
 3. **Enforce Share Diversity:** Ensure distinct shares are stored separately (different physical locations, storage systems, or administrators). Avoid keeping all shares in one place.
-4. **Implement Authentication:** When reconstructing, verify the source of each share. Use digital signatures or a VSS scheme to detect tampering or malicious actors.
-5. **Rotate Secrets Periodically:** For long-term secrets, periodically generate a new secret and corresponding shares. Destroy old shares securely to mitigate risk from previously leaked copies.
-6. **Audit and Monitor:** Maintain logs of share access, distribution, and reconstruction attempts. Monitor for suspicious activity that might indicate an attacker attempting to gather shares.
+4. **Use Authenticated Shares:** Leverage the `AuthenticatedShamirService` for applications requiring tamper detection. This provides automatic validation of share integrity and prevents reconstruction from corrupted or malicious shares.
+5. **Manage Authentication Keys Securely:** When using HMAC authentication, protect the shared key with the same rigor as the shares themselves. Consider using hardware security modules (HSMs) or key management services for production deployments.
+6. **Set Share Expiration:** Use temporal validity features to automatically expire shares after a defined period, reducing the window of opportunity for attackers who gradually collect shares.
+7. **Rotate Secrets Periodically:** For long-term secrets, periodically generate a new secret and corresponding shares. Destroy old shares securely to mitigate risk from previously leaked copies.
+8. **Audit and Monitor:** Maintain logs of share access, distribution, and reconstruction attempts. The `ValidateShares` method can be used to audit share integrity before critical operations.
 
 ## Conclusion
 
-The "ShamirSecretSharing" project delivers a clean, minimal implementation of Shamir's Secret Sharing for .NET applications. It provides strong protection against partial data compromise when used correctly. However, security ultimately depends on how shares are managed and protected after generation. By following the best practices outlined above, developers can leverage this library to distribute trust safely and securely.
+The "ShamirSecretSharing" project delivers a clean, minimal implementation of Shamir's Secret Sharing for .NET applications, now enhanced with authenticated shares for tamper detection. It provides strong protection against partial data compromise and share corruption when used correctly. The addition of HMAC-based authentication addresses a key vulnerability in traditional SSS implementations, making it suitable for production environments where share integrity is critical. However, security ultimately depends on how shares and authentication keys are managed and protected after generation. By following the best practices outlined above, developers can leverage this library to distribute trust safely and securely.
 
 ## References
 
