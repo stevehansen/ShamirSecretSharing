@@ -41,23 +41,24 @@ dotnet run --project ShamirSecretSharing.Console
 
 This is a Shamir's Secret Sharing cryptographic library implemented in pure C# for .NET 8/9. The solution consists of three projects:
 
-1. **ShamirSecretSharing** - Main library containing the core implementation
-   - `ShamirSecretSharingService.cs`: Main service class for splitting and reconstructing secrets
-   - `FiniteField.cs`: Implements arithmetic operations in Galois Field GF(p)
-   - `Share.cs`: Defines the Share record with serialization/deserialization logic
+1. **ShamirSecretSharing** - Main library (multi-targets `net8.0;net9.0`)
+   - `ShamirSecretSharingService.cs`: Main service class for splitting and reconstructing secrets using Lagrange interpolation
+   - `FiniteField.cs`: Implements arithmetic operations in Galois Field GF(p) using Fermat's little theorem for modular inverse
+   - `Share.cs`: Record type with hex-based serialization/deserialization via `ToString()`/`Parse()`
 
-2. **ShamirSecretSharingTests** - MSTest unit test project using MSTest.Sdk 3.9.1
+2. **ShamirSecretSharingTests** - MSTest unit test project using MSTest.Sdk 3.9.1 (targets `net8.0` only, parallel execution at method level)
 
 3. **ShamirSecretSharing.Console** - Console application for interactive testing
 
 ### Key Design Decisions
 
-- Uses GF(257) by default for finite field arithmetic (suitable for byte arrays, as 257 is the smallest prime > 255)
+- Uses GF(257) by default for finite field arithmetic (257 is the smallest prime > 255, suitable for byte arrays)
 - Implements (t, n) threshold scheme where n = total shares, t = threshold for reconstruction
-- Share serialization format: "X:Y0,Y1,Y2,..." for easy storage/transmission
+- Share serialization uses compact hex format: `"X:Y0Y1Y2..."` where X and Y values are hex-encoded. Y values use fixed 2-hex-digit encoding (zero-padded) for values 0x00-0xFF, and comma-delimited for values >= 0x100 (e.g., `,1F4,`)
 - Uses `System.Security.Cryptography.RandomNumberGenerator` for cryptographic randomness
-- All warnings are treated as errors (`TreatWarningsAsErrors=true`)
-- Latest C# language features and nullable reference types are enabled
+- `Directory.Build.props` enforces `TreatWarningsAsErrors`, `EnforceCodeStyleInBuild`, nullable reference types, and latest C# language version across all projects
+- `GenerateDocumentationFile` is enabled on the library project, so all public members require XML doc comments
+- Renovate is configured for automated dependency updates
 
 ### Security Considerations
 
