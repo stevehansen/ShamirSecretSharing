@@ -4,65 +4,76 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
-### Build Commands
+### Build
 ```bash
-# Build the solution
+# Build the solution (Debug)
 dotnet build
 
-# Build in Release mode
+# Release build
 dotnet build -c Release
 
-# Clean build artifacts
+# Clean
 dotnet clean
 ```
 
-### Test Commands
+### Test
 ```bash
 # Run all tests
 dotnet test
 
-# Run tests with verbose output
+# Verbose output
 dotnet test --logger "console;verbosity=detailed"
 
-# Run a specific test
+# Run a single test by name
 dotnet test --filter "FullyQualifiedName~TestMethodName"
 ```
 
-### Package Commands
+### Package & Run
 ```bash
-# Create NuGet package
+# Create NuGet package (+ snupkg symbol package)
 dotnet pack -c Release
 
-# Run the console application for interactive testing
+# Run the interactive console demo
 dotnet run --project ShamirSecretSharing.Console
 ```
 
-## Architecture Overview
+## Architecture
 
-This is a Shamir's Secret Sharing cryptographic library implemented in pure C# for .NET 8/9. The solution consists of three projects:
+Pure-C# Shamir's Secret Sharing library targeting .NET 8/9, with no dependencies beyond the BCL. Three projects in the solution:
 
-1. **ShamirSecretSharing** - Main library (multi-targets `net8.0;net9.0`)
-   - `ShamirSecretSharingService.cs`: Main service class for splitting and reconstructing secrets using Lagrange interpolation
-   - `FiniteField.cs`: Implements arithmetic operations in Galois Field GF(p) using Fermat's little theorem for modular inverse
-   - `Share.cs`: Record type with hex-based serialization/deserialization via `ToString()`/`Parse()`
+1. **ShamirSecretSharing** — main library (multi-targets `net8.0;net9.0`)
+   - `ShamirSecretSharingService.cs`: splits/reconstructs secrets. `SplitSecret` runs one polynomial *per byte* of the secret, evaluating it at `x = 1..n`; `ReconstructSecret` recovers each byte via Lagrange interpolation at `x = 0`.
+   - `FiniteField.cs`: arithmetic in GF(p). Modular inverse uses Fermat's little theorem (`Power(n, p-2)`), which requires p to be prime — the constructor does **not** verify primality.
+   - `Share.cs`: `record` with `X` (non-zero x-coordinate) and `YValues[]` (one entry per secret byte). Serializes via `ToString()` / `Parse()`.
 
-2. **ShamirSecretSharingTests** - MSTest unit test project using MSTest.Sdk 3.9.1 (targets `net8.0` only, parallel execution at method level)
+2. **ShamirSecretSharingTests** — MSTest (MSTest.Sdk 3.9.1), `net8.0` only, method-level parallel execution (`MSTestSettings.cs`).
 
-3. **ShamirSecretSharing.Console** - Console application for interactive testing
+3. **ShamirSecretSharing.Console** — interactive demo of split/reconstruct.
 
-### Key Design Decisions
+### Key design decisions
 
-- Uses GF(257) by default for finite field arithmetic (257 is the smallest prime > 255, suitable for byte arrays)
-- Implements (t, n) threshold scheme where n = total shares, t = threshold for reconstruction
-- Share serialization uses compact hex format: `"X:Y0Y1Y2..."` where X and Y values are hex-encoded. Y values use fixed 2-hex-digit encoding (zero-padded) for values 0x00-0xFF, and comma-delimited for values >= 0x100 (e.g., `,1F4,`)
-- Uses `System.Security.Cryptography.RandomNumberGenerator` for cryptographic randomness
-- `Directory.Build.props` enforces `TreatWarningsAsErrors`, `EnforceCodeStyleInBuild`, nullable reference types, and latest C# language version across all projects
-- `GenerateDocumentationFile` is enabled on the library project, so all public members require XML doc comments
-- Renovate is configured for automated dependency updates
+- Default prime is **GF(257)** (smallest prime > 255), so each secret byte fits in one field element. With this prime, `n` (total shares) is capped at 256.
+- `(t, n)` threshold scheme — `t` shares are required and sufficient to reconstruct. `t` must be ≥ 2.
+- Coefficients are sampled with `System.Security.Cryptography.RandomNumberGenerator`. **Per-coefficient bias:** the implementation does `randomBytes[i] % Prime` on a single byte; for `Prime = 257` this is effectively uniform on 0–255 (value 256 is unreachable but the constant term is the secret byte, so the polynomial's other coefficients have ~1/256 bias — acceptable for the default prime but worth keeping in mind if you change the prime).
+- Share string format from `Share.ToString()`: `"X:Y0Y1Y2..."` where `X` and each `Y` are uppercase hex. Y-values with hex length ≤ 2 are emitted as exactly 2 zero-padded hex digits with no separator; longer values are wrapped in commas (e.g. `,1F4,`). `Share.Parse()` is the inverse. This compact encoding assumes `Prime` is small enough that most Y-values fit in two hex digits; it still works for larger primes, just less compactly.
 
-### Security Considerations
+### Build & style enforcement
 
-- Each byte of the secret becomes a field element (0-255)
-- Maximum shares (n) is limited by Prime - 1 (256 for default prime 257)
-- Individual shares must be kept secret - exposure of t shares allows reconstruction
-- This is a basic SSS implementation without share verification (no VSS)
+`Directory.Build.props` applies to every project:
+- `TreatWarningsAsErrors=true`
+- `EnforceCodeStyleInBuild=true`
+- `Nullable=enable`, `ImplicitUsings=enable`, `LangVersion=latest`, `AnalysisLevel=latest`
+
+The library project additionally sets `GenerateDocumentationFile=true`. **Gotcha:** combined with `TreatWarningsAsErrors`, this means any public member without an XML doc comment fails the build (CS1591). When adding public API to `ShamirSecretSharing/`, write the `///` summary at the same time.
+
+### Security model
+
+- Each secret byte is treated as an independent field element; reconstruction is byte-wise.
+- Individual shares must stay secret — possession of `t` shares is sufficient to recover the entire secret.
+- This is a *basic* SSS implementation: no Verifiable Secret Sharing (VSS), no MAC, no integrity check. A malicious participant supplying a forged share will cause silent reconstruction of the wrong secret.
+- A STRIDE-style threat model lives in `STRIDE.md`; a longer write-up is in `docs/security-paper.md`. Consult these before extending the security-relevant code paths.
+
+### Other repo conventions
+
+- Renovate (`renovate.json`) handles dependency updates.
+- NuGet metadata (version, authors, license, README, icon) is set in `ShamirSecretSharing/ShamirSecretSharing.csproj`; `EmbedUntrackedSources` and `IncludeSymbols` are on, so `dotnet pack` produces source-linked `.snupkg` symbols.
