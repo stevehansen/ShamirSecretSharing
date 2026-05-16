@@ -5,6 +5,9 @@
 /// </summary>
 public class FiniteField
 {
+    internal const int DefaultPrime = 257; // Smallest prime > 255
+    internal const int StackallocThreshold = 256;
+
     /// <summary>
     /// Gets the prime modulus of the finite field.
     /// </summary>

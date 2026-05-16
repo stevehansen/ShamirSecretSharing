@@ -1,4 +1,4 @@
-﻿using System.Text;
+using System.Text;
 
 namespace ShamirSecretSharing;
 
@@ -14,9 +14,8 @@ namespace ShamirSecretSharing;
 /// </remarks>
 public class ShamirSecretSharingService
 {
-    private readonly FiniteField _field;
-    private const int DefaultPrime = 257; // Smallest prime > 255
-    private const int StackallocThreshold = 256;
+    private readonly SecretSplitter _splitter;
+    private readonly SecretCombiner _combiner;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ShamirSecretSharingService"/> class.
@@ -27,9 +26,10 @@ public class ShamirSecretSharingService
     /// the total shares <c>n</c> you intend to produce. For byte-array secrets, the
     /// default of 257 is suitable as it's the smallest prime greater than 255.
     /// </remarks>
-    public ShamirSecretSharingService(int prime = DefaultPrime)
+    public ShamirSecretSharingService(int prime = FiniteField.DefaultPrime)
     {
-        _field = new(prime);
+        _splitter = new(prime);
+        _combiner = new(prime);
     }
 
     /// <summary>
@@ -49,39 +49,7 @@ public class ShamirSecretSharingService
     {
         if (secret == null || secret.Length == 0)
             throw new ArgumentException("Secret cannot be null or empty.", nameof(secret));
-        if (t <= 1)
-            throw new ArgumentOutOfRangeException(nameof(t), "Threshold t must be greater than 1.");
-        if (n < t)
-            throw new ArgumentOutOfRangeException(nameof(n), "Total shares n must be greater than or equal to threshold t.");
-        if (n >= _field.Prime)
-            // X-coordinates must be < Prime. We use 1 to n. So n must be < Prime.
-            throw new ArgumentOutOfRangeException(nameof(n), $"Total shares n must be less than the prime modulus ({_field.Prime}).");
-
-        var yValuesPerShare = new int[n][];
-        for (var i = 0; i < n; i++)
-            yValuesPerShare[i] = new int[secret.Length];
-
-        Span<int> xs = n <= StackallocThreshold ? stackalloc int[n] : new int[n];
-        for (var i = 0; i < n; i++)
-            xs[i] = i + 1;
-
-        Span<int> ys = n <= StackallocThreshold ? stackalloc int[n] : new int[n];
-        for (var byteIndex = 0; byteIndex < secret.Length; byteIndex++)
-        {
-            var secretByte = secret[byteIndex];
-            if (secretByte >= _field.Prime)
-                throw new ArgumentException($"Secret byte value {secretByte} at index {byteIndex} is too large for the chosen prime {_field.Prime}.");
-
-            SecretPolynomial.SampleAndEvaluate(secretByte, t, xs, ys, _field);
-            for (var i = 0; i < n; i++)
-                yValuesPerShare[i][byteIndex] = ys[i];
-        }
-
-        var shares = new Share[n];
-        for (var i = 0; i < n; i++)
-            shares[i] = new(xs[i], yValuesPerShare[i]);
-
-        return shares;
+        return _splitter.Split(secret, n, t);
     }
 
     /// <summary>
@@ -101,34 +69,17 @@ public class ShamirSecretSharingService
         if (shares.Count < t)
             throw new ArgumentException($"Not enough shares provided to reconstruct. Need {t}, got {shares.Count}.", nameof(shares));
 
-        // Ensure all shares have the same YValues length
         var secretLength = shares[0].YValues.Length;
         if (shares.Any(s => s.YValues.Length != secretLength))
             throw new ArgumentException("All shares must have YValues of the same length.");
         if (secretLength == 0)
-            return []; // Or throw, depending on desired behavior for empty secret
+            return [];
 
-        // Take only t shares if more are provided, and check for distinct X values
         var distinctShares = shares.GroupBy(s => s.X).Select(g => g.First()).Take(t).ToList();
         if (distinctShares.Count < t)
             throw new ArgumentException($"Not enough distinct shares provided. Need {t} distinct X values, got {distinctShares.Count}.", nameof(shares));
 
-        Span<int> xs = t <= StackallocThreshold ? stackalloc int[t] : new int[t];
-        for (var i = 0; i < t; i++)
-            xs[i] = distinctShares[i].X;
-
-        var basis = SecretPolynomial.ComputeLagrangeBasisAtZero(xs, _field);
-        var reconstructedSecret = new byte[secretLength];
-        Span<int> ys = t <= StackallocThreshold ? stackalloc int[t] : new int[t];
-
-        for (var byteIndex = 0; byteIndex < secretLength; byteIndex++)
-        {
-            for (var i = 0; i < t; i++)
-                ys[i] = distinctShares[i].YValues[byteIndex];
-
-            reconstructedSecret[byteIndex] = (byte)SecretPolynomial.InterpolateWithBasis(ys, basis, _field);
-        }
-        return reconstructedSecret;
+        return _combiner.Combine(distinctShares);
     }
 
     /// <summary>
