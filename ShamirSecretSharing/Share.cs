@@ -48,13 +48,15 @@ public record Share
 
     /// <summary>
     /// Serializes the share to a compact string representation.
-    /// Format: X:Y0Y1Y2... (each Y as 2 hex digits, unless 3+ hex digits, then wrap with commas)
+    /// Format: <c>X:Y0Y1Y2...</c> where <c>X</c> is uppercase hex padded to a minimum
+    /// of 2 digits, and each <c>Y</c> is either 2 hex digits (zero-padded) or, for
+    /// values requiring 3 or more hex digits, wrapped in commas (e.g. <c>,1F4,</c>).
     /// </summary>
     /// <returns>A string representation of the share.</returns>
     public override string ToString()
     {
         var sb = new StringBuilder();
-        sb.Append(X.ToString("X"));
+        sb.Append(X.ToString("X2"));
         sb.Append(':');
         foreach (var y in YValues)
         {
