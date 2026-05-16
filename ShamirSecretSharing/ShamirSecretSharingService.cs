@@ -13,9 +13,10 @@ namespace ShamirSecretSharing;
 /// This implementation performs arithmetic in a finite field GF(p), where p is a
 /// prime number (default 257, suitable for byte values 0-255).
 /// </remarks>
-public class ShamirSecretSharingService
+public class ShamirSecretSharingService : IDisposable
 {
     private readonly FiniteField _field;
+    private readonly RandomNumberGenerator _rng;
     private const int DefaultPrime = 257; // Smallest prime > 255
 
     /// <summary>
@@ -30,6 +31,26 @@ public class ShamirSecretSharingService
     public ShamirSecretSharingService(int prime = DefaultPrime)
     {
         _field = new(prime);
+        _rng = RandomNumberGenerator.Create();
+    }
+
+    /// <summary>
+    /// Releases the underlying <see cref="RandomNumberGenerator"/>.
+    /// </summary>
+    public void Dispose()
+    {
+        Dispose(disposing: true);
+        GC.SuppressFinalize(this);
+    }
+
+    /// <summary>
+    /// Releases the unmanaged resources used by this instance and optionally the managed resources.
+    /// </summary>
+    /// <param name="disposing"><c>true</c> to release both managed and unmanaged resources; <c>false</c> to release only unmanaged resources.</param>
+    protected virtual void Dispose(bool disposing)
+    {
+        if (disposing)
+            _rng.Dispose();
     }
 
     /// <summary>
@@ -57,44 +78,27 @@ public class ShamirSecretSharingService
             // X-coordinates must be < Prime. We use 1 to n. So n must be < Prime.
             throw new ArgumentOutOfRangeException(nameof(n), $"Total shares n must be less than the prime modulus ({_field.Prime}).");
 
-        var shares = new Share[n];
         var yValuesPerShare = new int[n][];
         for (var i = 0; i < n; i++)
             yValuesPerShare[i] = new int[secret.Length];
 
-        // For each byte of the secret
-        var randomBytes = new byte[t - 1];
+        var xs = new int[n];
+        for (var i = 0; i < n; i++)
+            xs[i] = i + 1;
         for (var byteIndex = 0; byteIndex < secret.Length; byteIndex++)
         {
             var secretByte = secret[byteIndex];
             if (secretByte >= _field.Prime)
                 throw new ArgumentException($"Secret byte value {secretByte} at index {byteIndex} is too large for the chosen prime {_field.Prime}.");
 
-            // Generate t-1 random coefficients for the polynomial (a1 to a(t-1))
-            // P(x) = secretByte + a1*x + a2*x^2 + ... + a(t-1)*x^(t-1)
-            // a0 (constant term) is the secretByte
-            var coefficients = new int[t];
-            coefficients[0] = secretByte; // a0
-
-            RandomNumberGenerator.Fill(randomBytes); // Cryptographically secure random numbers
-
-            for (var i = 1; i < t; i++)
-            {
-                // Ensure coefficients are within the field
-                coefficients[i] = randomBytes[i - 1] % _field.Prime;
-            }
-
-            // Generate n points (shares) on this polynomial
-            for (var shareIndex = 0; shareIndex < n; shareIndex++)
-            {
-                var x = shareIndex + 1; // x-coordinates are 1, 2, ..., n (must be non-zero)
-                var y = EvaluatePolynomial(coefficients, x);
-                yValuesPerShare[shareIndex][byteIndex] = y;
-            }
+            var ys = SecretPolynomial.SampleAndEvaluate(secretByte, t, xs, _field, _rng);
+            for (var i = 0; i < n; i++)
+                yValuesPerShare[i][byteIndex] = ys[i];
         }
 
+        var shares = new Share[n];
         for (var i = 0; i < n; i++)
-            shares[i] = new(i + 1, yValuesPerShare[i]);
+            shares[i] = new(xs[i], yValuesPerShare[i]);
 
         return shares;
     }
@@ -128,62 +132,21 @@ public class ShamirSecretSharingService
         if (distinctShares.Count < t)
             throw new ArgumentException($"Not enough distinct shares provided. Need {t} distinct X values, got {distinctShares.Count}.", nameof(shares));
 
+        var xs = new int[t];
+        for (var i = 0; i < t; i++)
+            xs[i] = distinctShares[i].X;
 
         var reconstructedSecret = new byte[secretLength];
+        var ys = new int[t];
 
-        // Reconstruct each byte of the secret
         for (var byteIndex = 0; byteIndex < secretLength; byteIndex++)
         {
-            var reconstructedByte = 0;
+            for (var i = 0; i < t; i++)
+                ys[i] = distinctShares[i].YValues[byteIndex];
 
-            // Use Lagrange Interpolation to find P(0)
-            for (var i = 0; i < t; i++) // Iterate through the t shares being used
-            {
-                var (xi, yValues) = distinctShares[i];
-                var yi = yValues[byteIndex];
-
-                var lagrangeNumerator = 1;
-                var lagrangeDenominator = 1;
-
-                for (var j = 0; j < t; j++) // Iterate through other shares to build L_i(0)
-                {
-                    if (i == j) continue;
-
-                    var otherShare = distinctShares[j];
-                    var xj = otherShare.X;
-
-                    // L_i(0) = product_{j!=i} (xj / (xj - xi))
-                    // Or, using 0 - xj form for numerator: product_{j!=i} (-xj / (xi - xj))
-                    // Let's use: product_{j!=i} (xj / (xj - xi))
-                    lagrangeNumerator = _field.Multiply(lagrangeNumerator, xj);
-                    lagrangeDenominator = _field.Multiply(lagrangeDenominator, _field.Subtract(xj, xi));
-                }
-
-                var lagrangeBasisPolynomial = _field.Divide(lagrangeNumerator, lagrangeDenominator);
-                reconstructedByte = _field.Add(reconstructedByte, _field.Multiply(yi, lagrangeBasisPolynomial));
-            }
-            reconstructedSecret[byteIndex] = (byte)reconstructedByte;
+            reconstructedSecret[byteIndex] = (byte)SecretPolynomial.InterpolateAtZero(xs, ys, _field);
         }
         return reconstructedSecret;
-    }
-
-    /// <summary>
-    /// Evaluates a polynomial at a specified x-coordinate.
-    /// </summary>
-    /// <param name="coefficients">The coefficients of the polynomial, where coefficients[i] is the coefficient of x^i.</param>
-    /// <param name="x">The x-coordinate at which to evaluate the polynomial.</param>
-    /// <returns>The value of the polynomial at x.</returns>
-    private int EvaluatePolynomial(int[] coefficients, int x)
-    {
-        var result = 0;
-        var powerOfX = 1; // x^0
-        foreach (var coeff in coefficients)
-        {
-            var term = _field.Multiply(coeff, powerOfX);
-            result = _field.Add(result, term);
-            powerOfX = _field.Multiply(powerOfX, x);
-        }
-        return result;
     }
 
     /// <summary>
