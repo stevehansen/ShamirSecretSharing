@@ -61,7 +61,7 @@ public class ShamirSecretSharingService
         for (var i = 0; i < n; i++)
             yValuesPerShare[i] = new int[secret.Length];
 
-        var xs = new int[n];
+        Span<int> xs = n <= StackallocThreshold ? stackalloc int[n] : new int[n];
         for (var i = 0; i < n; i++)
             xs[i] = i + 1;
 
@@ -113,7 +113,7 @@ public class ShamirSecretSharingService
         if (distinctShares.Count < t)
             throw new ArgumentException($"Not enough distinct shares provided. Need {t} distinct X values, got {distinctShares.Count}.", nameof(shares));
 
-        var xs = new int[t];
+        Span<int> xs = t <= StackallocThreshold ? stackalloc int[t] : new int[t];
         for (var i = 0; i < t; i++)
             xs[i] = distinctShares[i].X;
 
