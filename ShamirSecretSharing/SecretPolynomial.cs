@@ -37,13 +37,10 @@ internal static class SecretPolynomial
         for (var i = 0; i < xs.Length; i++)
         {
             var x = xs[i];
+            // Horner's method: c0 + x*(c1 + x*(c2 + ... + x*c_{t-1})).
             var result = 0;
-            var powerOfX = 1;
-            foreach (var coeff in coefficients)
-            {
-                result = field.Add(result, field.Multiply(coeff, powerOfX));
-                powerOfX = field.Multiply(powerOfX, x);
-            }
+            for (var j = coefficients.Length - 1; j >= 0; j--)
+                result = field.Add(field.Multiply(result, x), coefficients[j]);
             ys[i] = result;
         }
     }

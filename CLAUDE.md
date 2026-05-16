@@ -54,7 +54,7 @@ Pure-C# Shamir's Secret Sharing library targeting .NET 8/9, with no dependencies
 
 - Default prime is **GF(257)** (smallest prime > 255), so each secret byte fits in one field element. With this prime, `n` (total shares) is capped at 256.
 - `(t, n)` threshold scheme — `t` shares are required and sufficient to reconstruct. `t` must be ≥ 2.
-- Coefficients are sampled with `System.Security.Cryptography.RandomNumberGenerator`. **Per-coefficient bias:** the implementation does `randomBytes[i] % Prime` on a single byte; for `Prime = 257` this is effectively uniform on 0–255 (value 256 is unreachable but the constant term is the secret byte, so the polynomial's other coefficients have ~1/256 bias — acceptable for the default prime but worth keeping in mind if you change the prime).
+- Coefficients are sampled with `RandomNumberGenerator.GetInt32(Prime)` (`System.Security.Cryptography`), which is unbiased across `0..Prime-1` for any prime.
 - Share string format from `Share.ToString()`: `"X:Y0Y1Y2..."` where `X` and each `Y` are uppercase hex. Y-values with hex length ≤ 2 are emitted as exactly 2 zero-padded hex digits with no separator; longer values are wrapped in commas (e.g. `,1F4,`). `Share.Parse()` is the inverse. This compact encoding assumes `Prime` is small enough that most Y-values fit in two hex digits; it still works for larger primes, just less compactly.
 
 ### Build & style enforcement
