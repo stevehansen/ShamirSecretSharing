@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 using ShamirSecretSharing;
 
 namespace ShamirSecretSharingTests;
@@ -13,7 +12,6 @@ public class SecretPolynomialTests
     {
         (int t, int n)[] combos = { (2, 3), (3, 5), (5, 7) };
         int[] secrets = { 0, 1, 77, 254, 255 };
-        using var rng = RandomNumberGenerator.Create();
 
         foreach (var (t, n) in combos)
         {
@@ -22,7 +20,8 @@ public class SecretPolynomialTests
 
             foreach (var secret in secrets)
             {
-                var ys = SecretPolynomial.SampleAndEvaluate(secret, t, xs, _field, rng);
+                var ys = new int[n];
+                SecretPolynomial.SampleAndEvaluate(secret, t, xs, ys, _field);
 
                 var xsSubset = new int[t];
                 var ysSubset = new int[t];
@@ -36,9 +35,8 @@ public class SecretPolynomialTests
     }
 
     [TestMethod]
-    public void SampleAndEvaluate_ReturnsOneYPerX()
+    public void SampleAndEvaluate_WritesOneYPerX()
     {
-        using var rng = RandomNumberGenerator.Create();
         int[][] xsCases =
         {
             new[] { 1, 2 },
@@ -48,7 +46,10 @@ public class SecretPolynomialTests
 
         foreach (var xs in xsCases)
         {
-            var ys = SecretPolynomial.SampleAndEvaluate(42, 2, xs, _field, rng);
+            var ys = new int[xs.Length];
+            SecretPolynomial.SampleAndEvaluate(42, 2, xs, ys, _field);
+            // Sentinel: at least one y differs from default when threshold > 1 with non-zero coefficients;
+            // we mainly assert no exception and that the destination span is the expected length.
             Assert.AreEqual(xs.Length, ys.Length);
         }
     }
@@ -56,12 +57,12 @@ public class SecretPolynomialTests
     [TestMethod]
     public void SampleAndEvaluate_YValuesInFieldRange()
     {
-        using var rng = RandomNumberGenerator.Create();
         var xs = new[] { 1, 2, 3, 4, 5, 6, 7 };
+        var ys = new int[xs.Length];
 
         for (var secret = 0; secret < 256; secret++)
         {
-            var ys = SecretPolynomial.SampleAndEvaluate(secret, 4, xs, _field, rng);
+            SecretPolynomial.SampleAndEvaluate(secret, 4, xs, ys, _field);
             foreach (var y in ys)
             {
                 Assert.IsTrue(y >= 0 && y < 257, $"y={y} out of range for secret={secret}");
@@ -70,34 +71,13 @@ public class SecretPolynomialTests
     }
 
     [TestMethod]
-    public void SampleAndEvaluate_Deterministic_WithScriptedRng()
+    public void SampleAndEvaluate_ThrowsOnLengthMismatch()
     {
-        var xs = new[] { 1, 2, 3, 4, 5 };
-        const int threshold = 4;
-        const int secret = 123;
-        byte[] script = { 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88 };
-
-        var rng1 = new ScriptedRng(script);
-        var rng2 = new ScriptedRng(script);
-
-        var ys1 = SecretPolynomial.SampleAndEvaluate(secret, threshold, xs, _field, rng1);
-        var ys2 = SecretPolynomial.SampleAndEvaluate(secret, threshold, xs, _field, rng2);
-
-        CollectionAssert.AreEqual(ys1, ys2);
-    }
-
-    [TestMethod]
-    public void SampleAndEvaluate_KnownPolynomial_FixedCoefficients()
-    {
-        // All random bytes = 0x03 → coefficients = (10, 3, 3).
-        // P(x) = 10 + 3x + 3x^2 mod 257
-        // P(1) = 16, P(2) = 28, P(3) = 46
-        var rng = new ScriptedRng(0x03, length: 2);
         var xs = new[] { 1, 2, 3 };
+        var ys = new int[2];
 
-        var ys = SecretPolynomial.SampleAndEvaluate(10, threshold: 3, xs, _field, rng);
-
-        CollectionAssert.AreEqual(new[] { 16, 28, 46 }, ys);
+        Assert.ThrowsException<ArgumentException>(() =>
+            SecretPolynomial.SampleAndEvaluate(10, 2, xs, ys, _field));
     }
 
     [TestMethod]
@@ -125,14 +105,60 @@ public class SecretPolynomialTests
     }
 
     [TestMethod]
-    public void InterpolateAtZero_AnyThresholdSubset_RecoversSame()
+    public void InterpolateAtZero_ThrowsOnLengthMismatch()
+    {
+        var xs = new[] { 1, 2, 3 };
+        var ys = new[] { 10, 15 };
+
+        Assert.ThrowsException<ArgumentException>(() =>
+            SecretPolynomial.InterpolateAtZero(xs, ys, _field));
+    }
+
+    [TestMethod]
+    public void ComputeLagrangeBasisAtZero_KnownVector_Quadratic()
+    {
+        // For xs = (1, 2, 3): basis[0] = L_0(0) = (2*3)/((2-1)*(3-1)) = 6/2 = 3.
+        // basis[1] = L_1(0) = (1*3)/((1-2)*(3-2)) = 3/(-1) = -3 ≡ 254 mod 257.
+        // basis[2] = L_2(0) = (1*2)/((1-3)*(2-3)) = 2/2 = 1.
+        var xs = new[] { 1, 2, 3 };
+
+        var basis = SecretPolynomial.ComputeLagrangeBasisAtZero(xs, _field);
+
+        CollectionAssert.AreEqual(new[] { 3, 254, 1 }, basis);
+    }
+
+    [TestMethod]
+    public void InterpolateWithBasis_AppliesBasisToYs()
+    {
+        // Using basis from above and ys for P(x) = 7 + 2x + x^2 (i.e. 10, 15, 22):
+        // result = 10*3 + 15*254 + 22*1 = 30 + 3810 + 22 = 3862. 3862 mod 257 = 3862 - 15*257 = 3862 - 3855 = 7.
+        var basis = new[] { 3, 254, 1 };
+        var ys = new[] { 10, 15, 22 };
+
+        var result = SecretPolynomial.InterpolateWithBasis(ys, basis, _field);
+
+        Assert.AreEqual(7, result);
+    }
+
+    [TestMethod]
+    public void InterpolateWithBasis_ThrowsOnLengthMismatch()
+    {
+        var ys = new[] { 10, 15, 22 };
+        var basis = new[] { 3, 254 };
+
+        Assert.ThrowsException<ArgumentException>(() =>
+            SecretPolynomial.InterpolateWithBasis(ys, basis, _field));
+    }
+
+    [TestMethod]
+    public void AnyThresholdSubset_RecoversSameSecret()
     {
         const int threshold = 3;
         const int secret = 88;
         var xs = new[] { 1, 2, 3, 4, 5 };
-        var rng = new ScriptedRng(0x07, length: 2);
+        var ys = new int[xs.Length];
 
-        var ys = SecretPolynomial.SampleAndEvaluate(secret, threshold, xs, _field, rng);
+        SecretPolynomial.SampleAndEvaluate(secret, threshold, xs, ys, _field);
 
         (int, int, int)[] subsets =
         {
@@ -155,10 +181,10 @@ public class SecretPolynomialTests
     [TestMethod]
     public void SampleAndEvaluate_SecretByteZero()
     {
-        using var rng = RandomNumberGenerator.Create();
         var xs = new[] { 1, 2, 3, 4 };
+        var ys = new int[xs.Length];
 
-        var ys = SecretPolynomial.SampleAndEvaluate(0, threshold: 3, xs, _field, rng);
+        SecretPolynomial.SampleAndEvaluate(0, threshold: 3, xs, ys, _field);
 
         var xsSub = new[] { xs[0], xs[1], xs[2] };
         var ysSub = new[] { ys[0], ys[1], ys[2] };
@@ -170,10 +196,10 @@ public class SecretPolynomialTests
     [TestMethod]
     public void SampleAndEvaluate_SecretByteMax_255()
     {
-        using var rng = RandomNumberGenerator.Create();
         var xs = new[] { 1, 2, 3, 4 };
+        var ys = new int[xs.Length];
 
-        var ys = SecretPolynomial.SampleAndEvaluate(255, threshold: 3, xs, _field, rng);
+        SecretPolynomial.SampleAndEvaluate(255, threshold: 3, xs, ys, _field);
 
         var xsSub = new[] { xs[0], xs[1], xs[2] };
         var ysSub = new[] { ys[0], ys[1], ys[2] };
@@ -185,41 +211,13 @@ public class SecretPolynomialTests
     [TestMethod]
     public void SampleAndEvaluate_Threshold2_MinimumPolynomial()
     {
-        using var rng = RandomNumberGenerator.Create();
         var xs = new[] { 1, 2 };
+        var ys = new int[xs.Length];
 
-        var ys = SecretPolynomial.SampleAndEvaluate(99, threshold: 2, xs, _field, rng);
+        SecretPolynomial.SampleAndEvaluate(99, threshold: 2, xs, ys, _field);
 
         var recovered = SecretPolynomial.InterpolateAtZero(xs, ys, _field);
 
         Assert.AreEqual(99, recovered);
-    }
-}
-
-// Test-only RNG. Overrides GetBytes(byte[]) and GetBytes(Span<byte>); if SecretPolynomial
-// ever switches to GetNonZeroBytes or the static RandomNumberGenerator.Fill, add an override here.
-internal sealed class ScriptedRng : RandomNumberGenerator
-{
-    private readonly byte[] _script;
-    private int _pos;
-
-    public ScriptedRng(params byte[] script) { _script = script; }
-
-    public ScriptedRng(byte fillValue, int length)
-    {
-        _script = new byte[length];
-        Array.Fill(_script, fillValue);
-    }
-
-    public override void GetBytes(byte[] data) => GetBytes(data.AsSpan());
-
-    public override void GetBytes(Span<byte> data)
-    {
-        for (var i = 0; i < data.Length; i++)
-        {
-            if (_pos >= _script.Length)
-                throw new InvalidOperationException("ScriptedRng exhausted.");
-            data[i] = _script[_pos++];
-        }
     }
 }

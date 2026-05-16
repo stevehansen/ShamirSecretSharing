@@ -1,5 +1,4 @@
-﻿using System.Security.Cryptography;
-using System.Text;
+﻿using System.Text;
 
 namespace ShamirSecretSharing;
 
@@ -13,11 +12,11 @@ namespace ShamirSecretSharing;
 /// This implementation performs arithmetic in a finite field GF(p), where p is a
 /// prime number (default 257, suitable for byte values 0-255).
 /// </remarks>
-public class ShamirSecretSharingService : IDisposable
+public class ShamirSecretSharingService
 {
     private readonly FiniteField _field;
-    private readonly RandomNumberGenerator _rng;
     private const int DefaultPrime = 257; // Smallest prime > 255
+    private const int StackallocThreshold = 256;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ShamirSecretSharingService"/> class.
@@ -31,26 +30,6 @@ public class ShamirSecretSharingService : IDisposable
     public ShamirSecretSharingService(int prime = DefaultPrime)
     {
         _field = new(prime);
-        _rng = RandomNumberGenerator.Create();
-    }
-
-    /// <summary>
-    /// Releases the underlying <see cref="RandomNumberGenerator"/>.
-    /// </summary>
-    public void Dispose()
-    {
-        Dispose(disposing: true);
-        GC.SuppressFinalize(this);
-    }
-
-    /// <summary>
-    /// Releases the unmanaged resources used by this instance and optionally the managed resources.
-    /// </summary>
-    /// <param name="disposing"><c>true</c> to release both managed and unmanaged resources; <c>false</c> to release only unmanaged resources.</param>
-    protected virtual void Dispose(bool disposing)
-    {
-        if (disposing)
-            _rng.Dispose();
     }
 
     /// <summary>
@@ -85,13 +64,15 @@ public class ShamirSecretSharingService : IDisposable
         var xs = new int[n];
         for (var i = 0; i < n; i++)
             xs[i] = i + 1;
+
+        Span<int> ys = n <= StackallocThreshold ? stackalloc int[n] : new int[n];
         for (var byteIndex = 0; byteIndex < secret.Length; byteIndex++)
         {
             var secretByte = secret[byteIndex];
             if (secretByte >= _field.Prime)
                 throw new ArgumentException($"Secret byte value {secretByte} at index {byteIndex} is too large for the chosen prime {_field.Prime}.");
 
-            var ys = SecretPolynomial.SampleAndEvaluate(secretByte, t, xs, _field, _rng);
+            SecretPolynomial.SampleAndEvaluate(secretByte, t, xs, ys, _field);
             for (var i = 0; i < n; i++)
                 yValuesPerShare[i][byteIndex] = ys[i];
         }
@@ -136,15 +117,16 @@ public class ShamirSecretSharingService : IDisposable
         for (var i = 0; i < t; i++)
             xs[i] = distinctShares[i].X;
 
+        var basis = SecretPolynomial.ComputeLagrangeBasisAtZero(xs, _field);
         var reconstructedSecret = new byte[secretLength];
-        var ys = new int[t];
+        Span<int> ys = t <= StackallocThreshold ? stackalloc int[t] : new int[t];
 
         for (var byteIndex = 0; byteIndex < secretLength; byteIndex++)
         {
             for (var i = 0; i < t; i++)
                 ys[i] = distinctShares[i].YValues[byteIndex];
 
-            reconstructedSecret[byteIndex] = (byte)SecretPolynomial.InterpolateAtZero(xs, ys, _field);
+            reconstructedSecret[byteIndex] = (byte)SecretPolynomial.InterpolateWithBasis(ys, basis, _field);
         }
         return reconstructedSecret;
     }
