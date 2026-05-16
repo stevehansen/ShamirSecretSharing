@@ -9,9 +9,9 @@ namespace ShamirSecretSharing;
 /// </summary>
 /// <remarks>
 /// Shamir's Secret Sharing is a cryptographic algorithm that splits a secret into
-/// multiple shares, requiring a threshold number of shares to reconstruct the original
-/// secret. This implementation uses a finite field GF(p) for calculations, where p
-/// is a prime number (default 257, suitable for byte values 0-255).
+/// <c>n</c> shares, any <c>t</c> of which can reconstruct the original secret.
+/// This implementation performs arithmetic in a finite field GF(p), where p is a
+/// prime number (default 257, suitable for byte values 0-255).
 /// </remarks>
 public class ShamirSecretSharingService
 {
@@ -23,9 +23,9 @@ public class ShamirSecretSharingService
     /// </summary>
     /// <param name="prime">The prime modulus to use for the finite field. Defaults to 257.</param>
     /// <remarks>
-    /// The prime value must be greater than any value in your secret data and greater than
-    /// the total number of shares you want to create. For byte array secrets, the default
-    /// value of 257 is suitable as it's the smallest prime greater than 255.
+    /// The prime must be greater than any single value in the secret and greater than
+    /// the total shares <c>n</c> you intend to produce. For byte-array secrets, the
+    /// default of 257 is suitable as it's the smallest prime greater than 255.
     /// </remarks>
     public ShamirSecretSharingService(int prime = DefaultPrime)
     {
@@ -36,7 +36,7 @@ public class ShamirSecretSharingService
     /// Splits a secret byte array into n shares, with t shares required for reconstruction.
     /// </summary>
     /// <param name="secret">The secret data to split.</param>
-    /// <param name="n">The total number of shares to create.</param>
+    /// <param name="n">The total shares to produce. Must satisfy <c>t &lt;= n &lt; Prime</c>.</param>
     /// <param name="t">The threshold of shares required to reconstruct the secret.</param>
     /// <returns>An array of n shares.</returns>
     /// <exception cref="ArgumentException">
@@ -52,10 +52,10 @@ public class ShamirSecretSharingService
         if (t <= 1)
             throw new ArgumentOutOfRangeException(nameof(t), "Threshold t must be greater than 1.");
         if (n < t)
-            throw new ArgumentOutOfRangeException(nameof(n), "Number of shares n must be greater than or equal to threshold t.");
+            throw new ArgumentOutOfRangeException(nameof(n), "Total shares n must be greater than or equal to threshold t.");
         if (n >= _field.Prime)
             // X-coordinates must be < Prime. We use 1 to n. So n must be < Prime.
-            throw new ArgumentOutOfRangeException(nameof(n), $"Number of shares n must be less than the prime modulus ({_field.Prime}).");
+            throw new ArgumentOutOfRangeException(nameof(n), $"Total shares n must be less than the prime modulus ({_field.Prime}).");
 
         var shares = new Share[n];
         var yValuesPerShare = new int[n][];
@@ -190,7 +190,7 @@ public class ShamirSecretSharingService
     /// Splits a secret string into n shares, with t shares required for reconstruction.
     /// </summary>
     /// <param name="secret">The secret string to split.</param>
-    /// <param name="n">The total number of shares to create.</param>
+    /// <param name="n">The total shares to produce. Must satisfy <c>t &lt;= n &lt; Prime</c>.</param>
     /// <param name="t">The threshold of shares required to reconstruct the secret.</param>
     /// <param name="encoding">The encoding to use for converting the string to bytes. Defaults to UTF-8.</param>
     /// <returns>An array of n shares.</returns>

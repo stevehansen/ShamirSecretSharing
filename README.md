@@ -13,8 +13,8 @@ A pure C# implementation of Shamir's Secret Sharing (SSS) scheme, designed for .
 Shamir's Secret Sharing allows you to split a secret (e.g., a password, an encryption key, or any piece of data) into multiple unique parts called "shares." The original secret can only be reconstructed if a sufficient number of these shares (a predefined threshold) are brought together. If fewer than the threshold number of shares are available, the secret remains completely hidden.
 
 This is a `(t, n)` threshold scheme:
--   `n`: The total number of shares generated.
--   `t`: The minimum number of shares required to reconstruct the original secret.
+-   `n`: Total shares generated.
+-   `t`: Threshold — the minimum distinct shares required to reconstruct the original secret.
 
 ## Features
 
@@ -124,7 +124,7 @@ The `Share` record provides methods for serialization:
 ### Prime Number (`_field.Prime`)
 
 -   The default prime used is 257. This is suitable for splitting `byte[]` secrets, as each byte (0-255) can be a field element.
--   The prime must be greater than the maximum value of an individual element of your secret and also greater than `n` (the total number of shares).
+-   The prime must be greater than the maximum value of an individual element of your secret and also greater than `n` (the total shares).
 -   You can specify a custom prime in the `ShamirSecretSharingService` constructor if needed, but ensure your secret data and `n` are compatible.
 
 ## Security Considerations
@@ -137,7 +137,7 @@ The `Share` record provides methods for serialization:
 ## Limitations
 
 -   The current implementation is primarily optimized for `byte[]` secrets using GF(257). Adapting it for secrets composed of larger data types (e.g., `int` arrays) would require adjusting the prime and potentially the `YValues` storage in the `Share` record.
--   The maximum number of shares (`n`) is limited by `Prime - 1`. For the default prime 257, `n` can be at most 256.
+-   The maximum total shares (`n`) is limited by `Prime - 1`. For the default prime 257, `n` can be at most 256.
 
 ## Project Structure
 

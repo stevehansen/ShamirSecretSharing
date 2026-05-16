@@ -40,7 +40,7 @@ Provided that the required number of valid shares are available, reconstruction 
 The project consists of three main components:
 
 - **FiniteField.cs:** Implements arithmetic within GF(p), where `p` is a prime number. The default prime is 257, allowing direct splitting of byte values (0-255).
-- **Share.cs:** Represents an individual share, storing an X coordinate and corresponding Y values. It also includes serialization methods for easy storage and transmission.
+- **Share.cs:** Represents an individual share, storing an X-coordinate and the corresponding Y-values (one per secret byte). It also includes serialization methods for easy storage and transmission.
 - **ShamirSecretSharingService.cs:** Provides methods to split and reconstruct secrets, using cryptographically secure random coefficients via `System.Security.Cryptography.RandomNumberGenerator`.
 
 Unit tests (`ShamirSecretSharingTests`) verify correctness of the splitting and reconstruction logic.
