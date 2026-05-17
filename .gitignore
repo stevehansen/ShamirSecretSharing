@@ -361,3 +361,6 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# Claude Code per-user local settings (permissions, hooks). Shared agent config lives elsewhere.
+.claude/settings.local.json
