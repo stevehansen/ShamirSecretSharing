@@ -3,7 +3,7 @@
 /// <summary>
 /// Handles arithmetic operations in a Galois Field GF(prime).
 /// </summary>
-public class FiniteField
+public sealed class FiniteField
 {
     internal const int DefaultPrime = 257; // Smallest prime > 255
     internal const int StackallocThreshold = 256;
@@ -14,16 +14,23 @@ public class FiniteField
     public int Prime { get; }
 
     /// <summary>
+    /// Shared GF(257) instance, the default field for byte-oriented secret sharing.
+    /// Immutable — safe to reuse across threads and across service instances.
+    /// </summary>
+    public static FiniteField Default { get; } = new FiniteField(DefaultPrime);
+
+    /// <summary>
     /// Initializes a new instance of the <see cref="FiniteField"/> class with the specified prime modulus.
     /// </summary>
-    /// <param name="prime">The prime modulus for the field. Must be a prime number.</param>
+    /// <param name="prime">The prime modulus for the field. Must be a prime number greater than or equal to 2.</param>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="prime"/> is less than 2.</exception>
+    /// <exception cref="ArgumentException"><paramref name="prime"/> is composite (including Carmichael numbers).</exception>
     public FiniteField(int prime)
     {
-        // Rudimentary prime check for this example.
-        // In a real-world scenario, use a robust primality test or known cryptographic primes.
-        if (prime <= 1) throw new ArgumentException("Prime must be greater than 1.");
-        // For simplicity, we'll assume the provided number is prime.
-        // For p=257, it is indeed prime.
+        if (prime < 2)
+            throw new ArgumentOutOfRangeException(nameof(prime), prime, "Prime must be >= 2.");
+        if (!Primality.IsPrime(prime))
+            throw new ArgumentException($"{prime} is not a prime number.", nameof(prime));
         Prime = prime;
     }
 

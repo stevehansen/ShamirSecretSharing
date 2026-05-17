@@ -23,7 +23,7 @@ public sealed class SecretSplitter
     /// </remarks>
     public SecretSplitter(int prime = FiniteField.DefaultPrime)
     {
-        _field = new(prime);
+        _field = prime == FiniteField.DefaultPrime ? FiniteField.Default : new FiniteField(prime);
     }
 
     /// <summary>

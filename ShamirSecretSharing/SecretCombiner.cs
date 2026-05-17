@@ -20,7 +20,7 @@ public sealed class SecretCombiner
     /// </remarks>
     public SecretCombiner(int prime = FiniteField.DefaultPrime)
     {
-        _field = new(prime);
+        _field = prime == FiniteField.DefaultPrime ? FiniteField.Default : new FiniteField(prime);
     }
 
     /// <summary>
