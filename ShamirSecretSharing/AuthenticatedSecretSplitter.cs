@@ -21,24 +21,43 @@ public sealed class AuthenticatedSecretSplitter
     private static readonly byte[] IssueIdLabel = Encoding.ASCII.GetBytes("issue");
 
     private readonly SecretSplitter _inner;
+    // Held alongside _inner (which receives the same instance) so the issue-key
+    // draw doesn't have to round-trip through the inner splitter's API.
+    private readonly RandomSource _random;
 
     /// <summary>
-    /// Initializes a new splitter using the default finite field GF(257).
+    /// Initializes a new splitter using the default finite field GF(257) and
+    /// <see cref="CryptoRandomSource"/>.
     /// </summary>
-    public AuthenticatedSecretSplitter() : this(FiniteField.DefaultPrime)
+    public AuthenticatedSecretSplitter() : this(FiniteField.DefaultPrime, CryptoRandomSource.Instance)
     {
     }
 
     /// <summary>
-    /// Initializes a new splitter with an explicit field prime. Must match the combiner.
+    /// Initializes a new splitter with an explicit field prime and
+    /// <see cref="CryptoRandomSource"/>. Prime must match the combiner.
     /// </summary>
     /// <param name="prime">Finite-field prime. Must be at least <see cref="AuthenticatedSecret.MinimumPrime"/> so the recursively-split 32-byte issue key (bytes 0..255) always fits in the field.</param>
     /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="prime"/> is less than <see cref="AuthenticatedSecret.MinimumPrime"/>.</exception>
-    public AuthenticatedSecretSplitter(int prime)
+    public AuthenticatedSecretSplitter(int prime) : this(prime, CryptoRandomSource.Instance)
+    {
+    }
+
+    /// <summary>
+    /// Initializes a new splitter with an explicit field prime and
+    /// <see cref="RandomSource"/>. The same <paramref name="randomSource"/> drives
+    /// the inner Shamir splitter's polynomial coefficients and this splitter's
+    /// 32-byte HMAC issue key — a single ordered byte transcript governs both.
+    /// </summary>
+    /// <param name="prime">Finite-field prime. Must be at least <see cref="AuthenticatedSecret.MinimumPrime"/>.</param>
+    /// <param name="randomSource">Source of random bytes and field elements. Use <see cref="CryptoRandomSource.Instance"/> for production.</param>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="prime"/> is less than <see cref="AuthenticatedSecret.MinimumPrime"/>.</exception>
+    public AuthenticatedSecretSplitter(int prime, RandomSource randomSource)
     {
         if (prime < AuthenticatedSecret.MinimumPrime)
             throw new ArgumentOutOfRangeException(nameof(prime), prime, $"Authenticated split requires prime >= {AuthenticatedSecret.MinimumPrime} so the recursively-split issue key always fits in the field.");
-        _inner = new SecretSplitter(prime);
+        _inner = new SecretSplitter(prime, randomSource);
+        _random = randomSource;
     }
 
     /// <summary>
@@ -53,9 +72,8 @@ public sealed class AuthenticatedSecretSplitter
     /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="shareCount"/> or <paramref name="threshold"/> are invalid.</exception>
     public AuthenticatedShare[] Split(ReadOnlySpan<byte> secret, int shareCount, int threshold)
     {
-        // TODO(#12): switch to IFieldRandomSource when #12 lands
         var issueKey = new byte[IssueKeyLength];
-        RandomNumberGenerator.Fill(issueKey);
+        _random.GetBytes(issueKey);
 
         try
         {

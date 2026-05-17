@@ -1,6 +1,4 @@
-﻿using System.Security.Cryptography;
-
-namespace ShamirSecretSharing;
+﻿namespace ShamirSecretSharing;
 
 /// <summary>
 /// Polynomial-shaped helpers for Shamir's Secret Sharing. Hides the polynomial
@@ -22,7 +20,8 @@ internal static class SecretPolynomial
         int threshold,
         ReadOnlySpan<int> xs,
         Span<int> ys,
-        FiniteField field)
+        FiniteField field,
+        RandomSource random)
     {
         if (xs.Length != ys.Length)
             throw new ArgumentException($"xs and ys must have the same length (xs={xs.Length}, ys={ys.Length}).");
@@ -31,8 +30,7 @@ internal static class SecretPolynomial
             ? stackalloc int[threshold]
             : new int[threshold];
         coefficients[0] = secretByte;
-        for (var i = 1; i < threshold; i++)
-            coefficients[i] = RandomNumberGenerator.GetInt32(field.Prime);
+        random.GetInts(coefficients.Slice(1, threshold - 1), field.Prime);
 
         for (var i = 0; i < xs.Length; i++)
         {

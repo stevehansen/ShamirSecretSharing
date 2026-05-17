@@ -11,9 +11,11 @@ namespace ShamirSecretSharing;
 public sealed class SecretSplitter
 {
     private readonly FiniteField _field;
+    private readonly RandomSource _random;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="SecretSplitter"/> class.
+    /// Initializes a new instance of the <see cref="SecretSplitter"/> class
+    /// backed by <see cref="CryptoRandomSource"/>.
     /// </summary>
     /// <param name="prime">The prime modulus to use for the finite field. Defaults to 257.</param>
     /// <remarks>
@@ -22,8 +24,20 @@ public sealed class SecretSplitter
     /// 255. It also caps the per-call <c>shareCount</c> at <c>prime - 1</c>.
     /// </remarks>
     public SecretSplitter(int prime = FiniteField.DefaultPrime)
+        : this(prime, CryptoRandomSource.Instance)
+    {
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="SecretSplitter"/> class with
+    /// an explicit <see cref="RandomSource"/>.
+    /// </summary>
+    /// <param name="prime">The prime modulus to use for the finite field.</param>
+    /// <param name="randomSource">Source of random field elements. Use <see cref="CryptoRandomSource.Instance"/> for production.</param>
+    public SecretSplitter(int prime, RandomSource randomSource)
     {
         _field = prime == FiniteField.DefaultPrime ? FiniteField.Default : new FiniteField(prime);
+        _random = randomSource;
     }
 
     /// <summary>
@@ -56,18 +70,21 @@ public sealed class SecretSplitter
         for (var i = 0; i < shareCount; i++)
             yValuesPerShare[i] = new int[secret.Length];
 
-        Span<int> xs = shareCount <= FiniteField.StackallocThreshold ? stackalloc int[shareCount] : new int[shareCount];
+        // One combined buffer for xs (first half) and ys (second half); same
+        // stack/heap threshold as before — when each half fits, the combined
+        // 2*shareCount stackalloc fits too.
+        Span<int> xsYs = shareCount <= FiniteField.StackallocThreshold ? stackalloc int[shareCount * 2] : new int[shareCount * 2];
+        var xs = xsYs[..shareCount];
+        var ys = xsYs[shareCount..];
         for (var i = 0; i < shareCount; i++)
             xs[i] = i + 1;
-
-        Span<int> ys = shareCount <= FiniteField.StackallocThreshold ? stackalloc int[shareCount] : new int[shareCount];
         for (var byteIndex = 0; byteIndex < secret.Length; byteIndex++)
         {
             var secretByte = secret[byteIndex];
             if (secretByte >= _field.Prime)
                 throw new ArgumentException($"Secret byte value {secretByte} at index {byteIndex} is too large for the chosen prime {_field.Prime}.");
 
-            SecretPolynomial.SampleAndEvaluate(secretByte, threshold, xs, ys, _field);
+            SecretPolynomial.SampleAndEvaluate(secretByte, threshold, xs, ys, _field, _random);
             for (var i = 0; i < shareCount; i++)
                 yValuesPerShare[i][byteIndex] = ys[i];
         }

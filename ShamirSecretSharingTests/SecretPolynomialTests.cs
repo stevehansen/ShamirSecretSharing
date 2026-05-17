@@ -21,7 +21,7 @@ public class SecretPolynomialTests
             foreach (var secret in secrets)
             {
                 var ys = new int[n];
-                SecretPolynomial.SampleAndEvaluate(secret, t, xs, ys, _field);
+                SecretPolynomial.SampleAndEvaluate(secret, t, xs, ys, _field, RandomSource.Default);
 
                 var xsSubset = new int[t];
                 var ysSubset = new int[t];
@@ -47,7 +47,7 @@ public class SecretPolynomialTests
         foreach (var xs in xsCases)
         {
             var ys = new int[xs.Length];
-            SecretPolynomial.SampleAndEvaluate(42, 2, xs, ys, _field);
+            SecretPolynomial.SampleAndEvaluate(42, 2, xs, ys, _field, RandomSource.Default);
             // Sentinel: at least one y differs from default when threshold > 1 with non-zero coefficients;
             // we mainly assert no exception and that the destination span is the expected length.
             Assert.AreEqual(xs.Length, ys.Length);
@@ -62,7 +62,7 @@ public class SecretPolynomialTests
 
         for (var secret = 0; secret < 256; secret++)
         {
-            SecretPolynomial.SampleAndEvaluate(secret, 4, xs, ys, _field);
+            SecretPolynomial.SampleAndEvaluate(secret, 4, xs, ys, _field, RandomSource.Default);
             foreach (var y in ys)
             {
                 Assert.IsTrue(y >= 0 && y < 257, $"y={y} out of range for secret={secret}");
@@ -77,7 +77,7 @@ public class SecretPolynomialTests
         var ys = new int[2];
 
         Assert.ThrowsException<ArgumentException>(() =>
-            SecretPolynomial.SampleAndEvaluate(10, 2, xs, ys, _field));
+            SecretPolynomial.SampleAndEvaluate(10, 2, xs, ys, _field, RandomSource.Default));
     }
 
     [TestMethod]
@@ -158,7 +158,7 @@ public class SecretPolynomialTests
         var xs = new[] { 1, 2, 3, 4, 5 };
         var ys = new int[xs.Length];
 
-        SecretPolynomial.SampleAndEvaluate(secret, threshold, xs, ys, _field);
+        SecretPolynomial.SampleAndEvaluate(secret, threshold, xs, ys, _field, RandomSource.Default);
 
         (int, int, int)[] subsets =
         {
@@ -184,7 +184,7 @@ public class SecretPolynomialTests
         var xs = new[] { 1, 2, 3, 4 };
         var ys = new int[xs.Length];
 
-        SecretPolynomial.SampleAndEvaluate(0, threshold: 3, xs, ys, _field);
+        SecretPolynomial.SampleAndEvaluate(0, threshold: 3, xs, ys, _field, RandomSource.Default);
 
         var xsSub = new[] { xs[0], xs[1], xs[2] };
         var ysSub = new[] { ys[0], ys[1], ys[2] };
@@ -199,7 +199,7 @@ public class SecretPolynomialTests
         var xs = new[] { 1, 2, 3, 4 };
         var ys = new int[xs.Length];
 
-        SecretPolynomial.SampleAndEvaluate(255, threshold: 3, xs, ys, _field);
+        SecretPolynomial.SampleAndEvaluate(255, threshold: 3, xs, ys, _field, RandomSource.Default);
 
         var xsSub = new[] { xs[0], xs[1], xs[2] };
         var ysSub = new[] { ys[0], ys[1], ys[2] };
@@ -214,7 +214,7 @@ public class SecretPolynomialTests
         var xs = new[] { 1, 2 };
         var ys = new int[xs.Length];
 
-        SecretPolynomial.SampleAndEvaluate(99, threshold: 2, xs, ys, _field);
+        SecretPolynomial.SampleAndEvaluate(99, threshold: 2, xs, ys, _field, RandomSource.Default);
 
         var recovered = SecretPolynomial.InterpolateAtZero(xs, ys, _field);
 

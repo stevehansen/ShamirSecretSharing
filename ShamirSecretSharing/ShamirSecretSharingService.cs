@@ -27,8 +27,19 @@ public class ShamirSecretSharingService
     /// default of 257 is suitable as it's the smallest prime greater than 255.
     /// </remarks>
     public ShamirSecretSharingService(int prime = FiniteField.DefaultPrime)
+        : this(prime, CryptoRandomSource.Instance)
     {
-        _splitter = new(prime);
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ShamirSecretSharingService"/> class
+    /// with an explicit <see cref="RandomSource"/>.
+    /// </summary>
+    /// <param name="prime">The prime modulus to use for the finite field.</param>
+    /// <param name="randomSource">Source of random field elements. Use <see cref="CryptoRandomSource.Instance"/> for production.</param>
+    public ShamirSecretSharingService(int prime, RandomSource randomSource)
+    {
+        _splitter = new(prime, randomSource);
         _combiner = new(prime);
     }
 
