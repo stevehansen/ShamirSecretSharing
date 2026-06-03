@@ -6,6 +6,7 @@ on:
 
 permissions:
   contents: write
+  id-token: write # Required for OIDC trusted publishing
 
 jobs:
   publish:
@@ -35,8 +36,14 @@ jobs:
       - name: Pack
         run: dotnet pack ShamirSecretSharing/ShamirSecretSharing.csproj -c Release -o artifacts
 
+      - name: NuGet login (OIDC)
+        uses: nuget/login@v1
+        id: login
+        with:
+          user: ${{ vars.NUGET_USER }}
+
       - name: Push to NuGet
-        run: dotnet nuget push "artifacts/*.nupkg" --api-key "${{ secrets.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
+        run: dotnet nuget push "artifacts/*.nupkg" --api-key "${{ steps.login.outputs.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
 
       - name: Extract changelog section
         run: |
