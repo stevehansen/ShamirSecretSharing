@@ -55,9 +55,11 @@ public class SecretSharingStringExtensionsTests
     }
 
     [TestMethod]
-    [ExpectedException(typeof(ArgumentNullException))]
     public void SplitExtension_ThrowsOnNullReceiver()
     {
-        ((SecretSplitter)null!).Split("hello", 3, 2);
+        Assert.ThrowsExactly<ArgumentNullException>(() =>
+        {
+            ((SecretSplitter)null!).Split("hello", 3, 2);
+        });
     }
 }

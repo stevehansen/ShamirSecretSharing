@@ -6,7 +6,7 @@ namespace ShamirSecretSharingTests;
 [TestClass]
 public class FiniteFieldConstructionTests
 {
-    [DataTestMethod]
+    [TestMethod]
     [DataRow(2)]
     [DataRow(3)]
     [DataRow(257)]
@@ -18,7 +18,7 @@ public class FiniteFieldConstructionTests
         Assert.AreEqual(prime, field.Prime);
     }
 
-    [DataTestMethod]
+    [TestMethod]
     [DataRow(4)]
     [DataRow(9)]
     [DataRow(25)]
@@ -27,12 +27,12 @@ public class FiniteFieldConstructionTests
     [DataRow(int.MaxValue - 1)]
     public void Constructor_RejectsComposites(int composite)
     {
-        Assert.ThrowsException<ArgumentException>(() => new FiniteField(composite));
+        Assert.ThrowsExactly<ArgumentException>(() => new FiniteField(composite));
     }
 
     // Carmichael numbers — composite, but pass a naive Fermat primality test for every
     // base coprime to n. They are the canonical reason we rely on Miller-Rabin, not Fermat.
-    [DataTestMethod]
+    [TestMethod]
     [DataRow(561)]
     [DataRow(1105)]
     [DataRow(1729)]
@@ -42,16 +42,16 @@ public class FiniteFieldConstructionTests
     [DataRow(8911)]
     public void Constructor_RejectsCarmichaelNumbers(int carmichael)
     {
-        Assert.ThrowsException<ArgumentException>(() => new FiniteField(carmichael));
+        Assert.ThrowsExactly<ArgumentException>(() => new FiniteField(carmichael));
     }
 
-    [DataTestMethod]
+    [TestMethod]
     [DataRow(-1)]
     [DataRow(0)]
     [DataRow(1)]
     public void Constructor_RejectsValuesLessThanTwo(int value)
     {
-        Assert.ThrowsException<ArgumentOutOfRangeException>(() => new FiniteField(value));
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => new FiniteField(value));
     }
 
     [TestMethod]

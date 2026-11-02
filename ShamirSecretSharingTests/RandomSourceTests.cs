@@ -17,7 +17,7 @@ public class RandomSourceTests
         var src = new SequenceRandomSource(new byte[16]);
         var dest = new int[1];
 
-        Assert.ThrowsException<ArgumentOutOfRangeException>(() => src.GetInts(dest, 0));
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => src.GetInts(dest, 0));
     }
 
     [TestMethod]
@@ -26,7 +26,7 @@ public class RandomSourceTests
         var src = new SequenceRandomSource(new byte[16]);
         var dest = new int[1];
 
-        Assert.ThrowsException<ArgumentOutOfRangeException>(() => src.GetInts(dest, -1));
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => src.GetInts(dest, -1));
     }
 
     [TestMethod]
@@ -44,7 +44,7 @@ public class RandomSourceTests
         Assert.AreEqual(5, dest[0]);
     }
 
-    [DataTestMethod]
+    [TestMethod]
     [DataRow(2)]
     [DataRow(3)]
     [DataRow(257)]
@@ -112,7 +112,7 @@ public class SequenceRandomSourceTests
 
         src.GetBytes(new byte[4]); // consume entire script
 
-        var ex = Assert.ThrowsException<InvalidOperationException>(() => src.GetBytes(new byte[1]));
+        var ex = Assert.ThrowsExactly<InvalidOperationException>(() => src.GetBytes(new byte[1]));
         StringAssert.Contains(ex.Message, "exhausted");
     }
 
@@ -122,7 +122,7 @@ public class SequenceRandomSourceTests
         byte[] script = { 0x01, 0x02, 0x03, 0x04 };
         var src = new SequenceRandomSource(script);
 
-        Assert.ThrowsException<InvalidOperationException>(() => src.GetBytes(new byte[8]));
+        Assert.ThrowsExactly<InvalidOperationException>(() => src.GetBytes(new byte[8]));
     }
 
     [TestMethod]

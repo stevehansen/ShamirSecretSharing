@@ -28,44 +28,56 @@ public class ShareSerializationTests
     }
 
     [TestMethod]
-    [ExpectedException(typeof(ArgumentNullException))]
     public void Share_Parse_ThrowsOnNull()
     {
-        Share.Parse(null!);
+        Assert.ThrowsExactly<ArgumentNullException>(() =>
+        {
+            Share.Parse(null!);
+        });
     }
 
     [TestMethod]
-    [ExpectedException(typeof(ArgumentNullException))]
     public void Share_Parse_ThrowsOnEmpty()
     {
-        Share.Parse("");
+        Assert.ThrowsExactly<ArgumentNullException>(() =>
+        {
+            Share.Parse("");
+        });
     }
 
     [TestMethod]
-    [ExpectedException(typeof(ArgumentException))]
     public void Share_Parse_ThrowsOnMissingColon()
     {
-        Share.Parse("01AA");
+        Assert.ThrowsExactly<ArgumentException>(() =>
+        {
+            Share.Parse("01AA");
+        });
     }
 
     [TestMethod]
-    [ExpectedException(typeof(ArgumentException))]
     public void Share_Parse_ThrowsOnInvalidX()
     {
-        Share.Parse("ZZ:00");
+        Assert.ThrowsExactly<ArgumentException>(() =>
+        {
+            Share.Parse("ZZ:00");
+        });
     }
 
     [TestMethod]
-    [ExpectedException(typeof(FormatException))]
     public void Share_Parse_ThrowsOnInvalidY()
     {
-        Share.Parse("01:GG");
+        Assert.ThrowsExactly<FormatException>(() =>
+        {
+            Share.Parse("01:GG");
+        });
     }
 
     [TestMethod]
-    [ExpectedException(typeof(FormatException))]
     public void Share_Parse_ThrowsOnUnmatchedComma()
     {
-        Share.Parse("01:,123");
+        Assert.ThrowsExactly<FormatException>(() =>
+        {
+            Share.Parse("01:,123");
+        });
     }
 }

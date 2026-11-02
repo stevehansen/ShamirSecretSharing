@@ -96,34 +96,38 @@ public class ShamirSecretSharingServiceTests
     }
 
     [TestMethod]
-    [ExpectedException(typeof(ArgumentException))]
     public void Reconstruct_TooFewShares_Fails()
     {
-        var secretString = "This should fail";
-        var n = 5;
-        var t = 3;
+        Assert.ThrowsExactly<ArgumentException>(() =>
+        {
+            var secretString = "This should fail";
+            var n = 5;
+            var t = 3;
 
-        var shares = _sss.SplitSecret(secretString, n, t);
+            var shares = _sss.SplitSecret(secretString, n, t);
 
-        var tooFewShares = new List<Share> { shares[0], shares[1] }; // Only 2, need 3
-        _sss.ReconstructSecretString(tooFewShares, t); // This should throw
+            var tooFewShares = new List<Share> { shares[0], shares[1] }; // Only 2, need 3
+            _sss.ReconstructSecretString(tooFewShares, t); // This should throw
+        });
     }
 
     [TestMethod]
-    [ExpectedException(typeof(ArgumentException))]
     public void Reconstruct_TooFewDistinctShares_Fails()
     {
-        var secretString = "This should also fail";
-        var n = 5;
-        var t = 3;
+        Assert.ThrowsExactly<ArgumentException>(() =>
+        {
+            var secretString = "This should also fail";
+            var n = 5;
+            var t = 3;
 
-        var shares = _sss.SplitSecret(secretString, n, t);
+            var shares = _sss.SplitSecret(secretString, n, t);
 
-        // Provide 3 shares, but 2 of them are identical (same X) - our reconstruction handles distinct.
-        // If we modify to pass non-distinct it should fail.
-        // The current ReconstructSecret already picks distinct shares, so this tests that logic.
-        var nonDistinctShares = new List<Share> { shares[0], shares[0], shares[1] };
-        _sss.ReconstructSecretString(nonDistinctShares, t); // This should throw due to not enough distinct
+            // Provide 3 shares, but 2 of them are identical (same X) - our reconstruction handles distinct.
+            // If we modify to pass non-distinct it should fail.
+            // The current ReconstructSecret already picks distinct shares, so this tests that logic.
+            var nonDistinctShares = new List<Share> { shares[0], shares[0], shares[1] };
+            _sss.ReconstructSecretString(nonDistinctShares, t); // This should throw due to not enough distinct
+        });
     }
 
     [TestMethod]
