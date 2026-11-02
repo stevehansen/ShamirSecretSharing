@@ -57,15 +57,15 @@ public class AuthenticatedSecretTests
     [TestMethod]
     public void Splitter_Ctor_RejectsPrimeBelow256()
     {
-        Assert.ThrowsException<ArgumentOutOfRangeException>(() => new AuthenticatedSecretSplitter(prime: 23));
-        Assert.ThrowsException<ArgumentOutOfRangeException>(() => new AuthenticatedSecretSplitter(prime: 255));
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => new AuthenticatedSecretSplitter(prime: 23));
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => new AuthenticatedSecretSplitter(prime: 255));
     }
 
     [TestMethod]
     public void Combiner_Ctor_RejectsPrimeBelow256()
     {
-        Assert.ThrowsException<ArgumentOutOfRangeException>(() => new AuthenticatedSecretCombiner(prime: 23));
-        Assert.ThrowsException<ArgumentOutOfRangeException>(() => new AuthenticatedSecretCombiner(prime: 255));
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => new AuthenticatedSecretCombiner(prime: 23));
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => new AuthenticatedSecretCombiner(prime: 255));
     }
 
     [TestMethod]
@@ -98,7 +98,7 @@ public class AuthenticatedSecretTests
         var bad = TamperShareY(shares[0], yIndex: 0, prime: 257);
         var subset = new List<AuthenticatedShare> { bad, shares[1], shares[2] };
 
-        var ex = Assert.ThrowsException<ShareAuthenticationException>(() => _combiner.Combine(subset));
+        var ex = Assert.ThrowsExactly<ShareAuthenticationException>(() => _combiner.Combine(subset));
         CollectionAssert.Contains(ex.OffendingShareXs.ToArray(), bad.Share.X);
     }
 
@@ -114,7 +114,7 @@ public class AuthenticatedSecretTests
         var bad = new AuthenticatedShare(shares[0].Share, shares[0].KeyShare, tamperedTag, shares[0].IssueId);
         var subset = new List<AuthenticatedShare> { bad, shares[1], shares[2] };
 
-        var ex = Assert.ThrowsException<ShareAuthenticationException>(() => _combiner.Combine(subset));
+        var ex = Assert.ThrowsExactly<ShareAuthenticationException>(() => _combiner.Combine(subset));
         CollectionAssert.Contains(ex.OffendingShareXs.ToArray(), bad.Share.X);
     }
 
@@ -131,7 +131,7 @@ public class AuthenticatedSecretTests
         var bad = new AuthenticatedShare(shares[1].Share, shares[1].KeyShare, shares[1].Tag, tamperedIssueId);
 
         var subset = new List<AuthenticatedShare> { shares[0], bad, shares[2] };
-        var ex = Assert.ThrowsException<ShareAuthenticationException>(() => _combiner.Combine(subset));
+        var ex = Assert.ThrowsExactly<ShareAuthenticationException>(() => _combiner.Combine(subset));
         CollectionAssert.Contains(ex.OffendingShareXs.ToArray(), bad.Share.X);
     }
 
@@ -145,7 +145,7 @@ public class AuthenticatedSecretTests
         // Pick X-distinct shares: A[0], A[1] (Xs 1,2), B[2] (X 3).
         var subset = new List<AuthenticatedShare> { sharesA[0], sharesA[1], sharesB[2] };
 
-        var ex = Assert.ThrowsException<ShareAuthenticationException>(() => _combiner.Combine(subset));
+        var ex = Assert.ThrowsExactly<ShareAuthenticationException>(() => _combiner.Combine(subset));
         // The B-sourced share has a different IssueId than the reference (sharesA[0]).
         CollectionAssert.Contains(ex.OffendingShareXs.ToArray(), sharesB[2].Share.X);
     }
@@ -164,104 +164,130 @@ public class AuthenticatedSecretTests
     }
 
     [TestMethod]
-    [ExpectedException(typeof(ArgumentNullException))]
     public void AuthenticatedShare_Parse_ThrowsOnEmpty()
     {
-        AuthenticatedShare.Parse("");
+        Assert.ThrowsExactly<ArgumentNullException>(() =>
+        {
+            AuthenticatedShare.Parse("");
+        });
     }
 
     [TestMethod]
-    [ExpectedException(typeof(FormatException))]
     public void AuthenticatedShare_Parse_ThrowsOnSingleSeparator()
     {
-        AuthenticatedShare.Parse("01:00|02:00");
+        Assert.ThrowsExactly<FormatException>(() =>
+        {
+            AuthenticatedShare.Parse("01:00|02:00");
+        });
     }
 
     [TestMethod]
-    [ExpectedException(typeof(FormatException))]
     public void AuthenticatedShare_Parse_ThrowsOnFourSeparators()
     {
-        AuthenticatedShare.Parse("01:00|02:00|aa|bb|cc");
+        Assert.ThrowsExactly<FormatException>(() =>
+        {
+            AuthenticatedShare.Parse("01:00|02:00|aa|bb|cc");
+        });
     }
 
     [TestMethod]
-    [ExpectedException(typeof(FormatException))]
     public void AuthenticatedShare_Parse_ThrowsOnMalformedInnerShare()
     {
-        // "ZZ:00" — invalid X — should bubble up as FormatException per implementer's wrap.
-        var trailer = new string('0', (16 + 4) * 2);
-        AuthenticatedShare.Parse($"ZZ:00|02:00|{trailer}");
+        Assert.ThrowsExactly<FormatException>(() =>
+        {
+            // "ZZ:00" — invalid X — should bubble up as FormatException per implementer's wrap.
+            var trailer = new string('0', (16 + 4) * 2);
+            AuthenticatedShare.Parse($"ZZ:00|02:00|{trailer}");
+        });
     }
 
     [TestMethod]
-    [ExpectedException(typeof(FormatException))]
     public void AuthenticatedShare_Parse_ThrowsOnNonHexTrailer()
     {
-        var trailer = new string('G', (16 + 4) * 2);
-        AuthenticatedShare.Parse($"01:00|02:00|{trailer}");
+        Assert.ThrowsExactly<FormatException>(() =>
+        {
+            var trailer = new string('G', (16 + 4) * 2);
+            AuthenticatedShare.Parse($"01:00|02:00|{trailer}");
+        });
     }
 
     [TestMethod]
-    [ExpectedException(typeof(FormatException))]
     public void AuthenticatedShare_Parse_ThrowsOnWrongLengthTrailer()
     {
-        // Trailer too short.
-        AuthenticatedShare.Parse("01:00|02:00|ABCD");
+        Assert.ThrowsExactly<FormatException>(() =>
+        {
+            // Trailer too short.
+            AuthenticatedShare.Parse("01:00|02:00|ABCD");
+        });
     }
 
     [TestMethod]
-    [ExpectedException(typeof(ArgumentException))]
     public void Split_EmptySecret_Throws()
     {
-        _splitter.Split(Array.Empty<byte>(), shareCount: 3, threshold: 2);
+        Assert.ThrowsExactly<ArgumentException>(() =>
+        {
+            _splitter.Split(Array.Empty<byte>(), shareCount: 3, threshold: 2);
+        });
     }
 
     [TestMethod]
-    [ExpectedException(typeof(ArgumentOutOfRangeException))]
     public void Split_ThresholdTooSmall_Throws()
     {
-        byte[] secret = { 1, 2, 3 };
-        _splitter.Split(secret, shareCount: 3, threshold: 1);
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() =>
+        {
+            byte[] secret = { 1, 2, 3 };
+            _splitter.Split(secret, shareCount: 3, threshold: 1);
+        });
     }
 
     [TestMethod]
-    [ExpectedException(typeof(ArgumentOutOfRangeException))]
     public void Split_ShareCountLessThanThreshold_Throws()
     {
-        byte[] secret = { 1, 2, 3 };
-        _splitter.Split(secret, shareCount: 2, threshold: 3);
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() =>
+        {
+            byte[] secret = { 1, 2, 3 };
+            _splitter.Split(secret, shareCount: 2, threshold: 3);
+        });
     }
 
     [TestMethod]
-    [ExpectedException(typeof(ArgumentOutOfRangeException))]
     public void Split_ShareCountAtLeastPrime_Throws()
     {
-        var splitter = new AuthenticatedSecretSplitter(prime: 5);
-        byte[] secret = { 1, 2 };
-        splitter.Split(secret, shareCount: 5, threshold: 2); // shareCount must be < prime
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() =>
+        {
+            var splitter = new AuthenticatedSecretSplitter(prime: 5);
+            byte[] secret = { 1, 2 };
+            splitter.Split(secret, shareCount: 5, threshold: 2); // shareCount must be < prime
+        });
     }
 
     [TestMethod]
-    [ExpectedException(typeof(ArgumentNullException))]
     public void Combine_NullShares_Throws()
     {
-        _combiner.Combine(null!);
+        Assert.ThrowsExactly<ArgumentNullException>(() =>
+        {
+            _combiner.Combine(null!);
+        });
     }
 
     [TestMethod]
-    [ExpectedException(typeof(ArgumentException))]
     public void Combine_EmptyShares_Throws()
     {
-        _combiner.Combine(new List<AuthenticatedShare>());
+        Assert.ThrowsExactly<ArgumentException>(() =>
+        {
+            _combiner.Combine(new List<AuthenticatedShare>());
+        });
     }
 
     [TestMethod]
-    [ExpectedException(typeof(ArgumentException))]
     public void Combine_DuplicateX_Throws()
     {
-        byte[] secret = { 1, 2, 3 };
-        var shares = _splitter.Split(secret, shareCount: 3, threshold: 2);
-        _combiner.Combine(new List<AuthenticatedShare> { shares[0], shares[0], shares[1] });
+        Assert.ThrowsExactly<ArgumentException>(() =>
+        {
+            byte[] secret = { 1, 2, 3 };
+            var shares = _splitter.Split(secret, shareCount: 3, threshold: 2);
+            _combiner.Combine(new List<AuthenticatedShare> { shares[0], shares[0], shares[1] });
+        });
     }
 
     [TestMethod]
@@ -294,7 +320,7 @@ public class AuthenticatedSecretTests
         var bad4 = TamperTag(shares[4]);
 
         var subset = new List<AuthenticatedShare> { bad0, shares[1], bad2, shares[3], bad4 };
-        var ex = Assert.ThrowsException<ShareAuthenticationException>(() => _combiner.Combine(subset));
+        var ex = Assert.ThrowsExactly<ShareAuthenticationException>(() => _combiner.Combine(subset));
 
         var offendingXs = ex.OffendingShareXs.ToArray();
         CollectionAssert.Contains(offendingXs, bad0.Share.X);

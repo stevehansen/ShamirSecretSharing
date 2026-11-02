@@ -20,21 +20,25 @@ public class SecretCombinerTests
     }
 
     [TestMethod]
-    [ExpectedException(typeof(ArgumentException))]
     public void ReconstructSecret_ThrowsWhenShareLengthsDiffer()
     {
-        var s1 = new Share(1, new[] { 1, 2 });
-        var s2 = new Share(2, new[] { 3 });
-        _combiner.Combine(new List<Share> { s1, s2 });
+        Assert.ThrowsExactly<ArgumentException>(() =>
+        {
+            var s1 = new Share(1, new[] { 1, 2 });
+            var s2 = new Share(2, new[] { 3 });
+            _combiner.Combine(new List<Share> { s1, s2 });
+        });
     }
 
     [TestMethod]
-    [ExpectedException(typeof(ArgumentException))]
     public void Combine_ThrowsOnDuplicateXCoordinates()
     {
-        var s1 = new Share(1, new[] { 1, 2 });
-        var s2 = new Share(1, new[] { 3, 4 }); // same X
-        _combiner.Combine(new List<Share> { s1, s2 });
+        Assert.ThrowsExactly<ArgumentException>(() =>
+        {
+            var s1 = new Share(1, new[] { 1, 2 });
+            var s2 = new Share(1, new[] { 3, 4 }); // same X
+            _combiner.Combine(new List<Share> { s1, s2 });
+        });
     }
 
     [TestMethod]
@@ -57,17 +61,21 @@ public class SecretCombinerTests
     }
 
     [TestMethod]
-    [ExpectedException(typeof(ArgumentNullException))]
     public void Combine_NullShares_Throws()
     {
-        _combiner.Combine(null!);
+        Assert.ThrowsExactly<ArgumentNullException>(() =>
+        {
+            _combiner.Combine(null!);
+        });
     }
 
     [TestMethod]
-    [ExpectedException(typeof(ArgumentException))]
     public void Combine_EmptyShares_Throws()
     {
-        _combiner.Combine(new List<Share>());
+        Assert.ThrowsExactly<ArgumentException>(() =>
+        {
+            _combiner.Combine(new List<Share>());
+        });
     }
 
     [TestMethod]

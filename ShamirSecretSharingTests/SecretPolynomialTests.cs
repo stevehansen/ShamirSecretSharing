@@ -76,7 +76,7 @@ public class SecretPolynomialTests
         var xs = new[] { 1, 2, 3 };
         var ys = new int[2];
 
-        Assert.ThrowsException<ArgumentException>(() =>
+        Assert.ThrowsExactly<ArgumentException>(() =>
             SecretPolynomial.SampleAndEvaluate(10, 2, xs, ys, _field, RandomSource.Default));
     }
 
@@ -110,7 +110,7 @@ public class SecretPolynomialTests
         var xs = new[] { 1, 2, 3 };
         var ys = new[] { 10, 15 };
 
-        Assert.ThrowsException<ArgumentException>(() =>
+        Assert.ThrowsExactly<ArgumentException>(() =>
             SecretPolynomial.InterpolateAtZero(xs, ys, _field));
     }
 
@@ -146,7 +146,7 @@ public class SecretPolynomialTests
         var ys = new[] { 10, 15, 22 };
         var basis = new[] { 3, 254 };
 
-        Assert.ThrowsException<ArgumentException>(() =>
+        Assert.ThrowsExactly<ArgumentException>(() =>
             SecretPolynomial.InterpolateWithBasis(ys, basis, _field));
     }
 

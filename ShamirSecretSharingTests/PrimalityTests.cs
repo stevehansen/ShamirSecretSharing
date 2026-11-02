@@ -5,7 +5,7 @@ namespace ShamirSecretSharingTests;
 [TestClass]
 public class PrimalityTests
 {
-    [DataTestMethod]
+    [TestMethod]
     [DataRow(2)]
     [DataRow(3)]
     [DataRow(257)]
@@ -16,7 +16,7 @@ public class PrimalityTests
         Assert.IsTrue(Primality.IsPrime(prime));
     }
 
-    [DataTestMethod]
+    [TestMethod]
     [DataRow(4)]
     [DataRow(9)]
     [DataRow(25)]
@@ -30,7 +30,7 @@ public class PrimalityTests
 
     // Carmichael numbers — composite, but pass a naive Fermat primality test for every
     // base coprime to n. Miller-Rabin with witnesses {2, 7, 61} catches them.
-    [DataTestMethod]
+    [TestMethod]
     [DataRow(561)]
     [DataRow(1105)]
     [DataRow(1729)]
@@ -43,7 +43,7 @@ public class PrimalityTests
         Assert.IsFalse(Primality.IsPrime(carmichael));
     }
 
-    [DataTestMethod]
+    [TestMethod]
     [DataRow(-1)]
     [DataRow(0)]
     [DataRow(1)]
